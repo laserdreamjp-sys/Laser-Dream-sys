@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 40 33% 98%;
+  --foreground: 30 20% 12%;
+  --border: 36 20% 88%;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", ui-serif, serif;
+}
+
+.dark {
+  --background: 30 15% 9%;
+  --foreground: 40 20% 92%;
+  --border: 30 12% 20%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background-color: hsl(var(--background));
+  color: hsl(var(--foreground));
+}
