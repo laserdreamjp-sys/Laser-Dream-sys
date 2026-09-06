@@ -24,7 +24,9 @@ export default function AcceptInvitePage() {
 
   useEffect(() => {
     async function lookup() {
-      const { data, error } = await supabase.rpc("get_invite_by_token", { p_token: token });
+      const { data, error } = (await (supabase.rpc as any)("get_invite_by_token", {
+        p_token: token,
+      })) as { data: InviteInfo[] | null; error: unknown };
 
       if (error || !data || data.length === 0) {
         setStatus("invalid");

@@ -13,14 +13,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
+  const { data: profileRaw } = await supabase
     .from("profiles")
     .select("full_name, roles(name)")
     .eq("id", user.id)
     .single();
 
+  const profile = profileRaw as { full_name: string; roles: { name: string } | null } | null;
+
   const fullName = profile?.full_name ?? user.email ?? "";
-  const roleName = (profile?.roles as { name: string } | null)?.name ?? "";
+  const roleName = profile?.roles?.name ?? "";
 
   return (
     <div className="flex bg-gold-50">

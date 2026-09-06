@@ -11,22 +11,30 @@ export default async function DashboardPage() {
   firstDayOfMonth.setDate(1);
   const isoFirstDay = firstDayOfMonth.toISOString().slice(0, 10);
 
-  const [{ data: sales }, { data: cashIn }, { data: cashOut }] = await Promise.all([
-    supabase
-      .from("sales")
-      .select("amount")
-      .eq("status", "ativa")
-      .gte("sale_date", isoFirstDay),
-    supabase.from("cash_transactions").select("amount").eq("type", "entrada"),
-    supabase.from("cash_transactions").select("amount").eq("type", "saida"),
-  ]);
+  const salesRes = await supabase
+    .from("sales")
+    .select("amount")
+    .eq("status", "ativa")
+    .gte("sale_date", isoFirstDay);
+  const cashInRes = await supabase
+    .from("cash_transactions")
+    .select("amount")
+    .eq("type", "entrada");
+  const cashOutRes = await supabase
+    .from("cash_transactions")
+    .select("amount")
+    .eq("type", "saida");
 
-  const faturamento = (sales ?? []).reduce((acc, s) => acc + Number(s.amount), 0);
-  const numeroVendas = sales?.length ?? 0;
+  const sales: { amount: number }[] = salesRes.data ?? [];
+  const cashIn: { amount: number }[] = cashInRes.data ?? [];
+  const cashOut: { amount: number }[] = cashOutRes.data ?? [];
+
+  const faturamento = sales.reduce((acc, s) => acc + Number(s.amount), 0);
+  const numeroVendas = sales.length;
   const ticketMedio = numeroVendas > 0 ? faturamento / numeroVendas : 0;
 
-  const totalEntradas = (cashIn ?? []).reduce((acc, c) => acc + Number(c.amount), 0);
-  const totalSaidas = (cashOut ?? []).reduce((acc, c) => acc + Number(c.amount), 0);
+  const totalEntradas = cashIn.reduce((acc, c) => acc + Number(c.amount), 0);
+  const totalSaidas = cashOut.reduce((acc, c) => acc + Number(c.amount), 0);
   const saldoCaixa = totalEntradas - totalSaidas;
 
   const cards = [

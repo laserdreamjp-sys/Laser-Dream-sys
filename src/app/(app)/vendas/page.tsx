@@ -12,11 +12,23 @@ function formatDate(value: string) {
 export default async function VendasPage() {
   const supabase = createClient();
 
-  const { data: sales } = await supabase
+  const { data: salesRaw } = await supabase
     .from("sales")
     .select("id, sale_date, amount, payment_method, status, clients(name), profiles!sales_seller_id_fkey(full_name)")
     .order("sale_date", { ascending: false })
     .limit(50);
+
+  type SaleRow = {
+    id: string;
+    sale_date: string;
+    amount: number;
+    payment_method: string;
+    status: string;
+    clients: { name: string } | null;
+    profiles: { full_name: string } | null;
+  };
+
+  const sales = (salesRaw ?? []) as unknown as SaleRow[];
 
   return (
     <div>
@@ -43,13 +55,11 @@ export default async function VendasPage() {
             </tr>
           </thead>
           <tbody>
-            {(sales ?? []).map((sale) => (
+            {sales.map((sale) => (
               <tr key={sale.id} className="border-t border-gold-50">
                 <td className="px-4 py-3">{formatDate(sale.sale_date)}</td>
-                <td className="px-4 py-3">{(sale.clients as { name: string } | null)?.name}</td>
-                <td className="px-4 py-3">
-                  {(sale.profiles as { full_name: string } | null)?.full_name}
-                </td>
+                <td className="px-4 py-3">{sale.clients?.name}</td>
+                <td className="px-4 py-3">{sale.profiles?.full_name}</td>
                 <td className="px-4 py-3">{sale.payment_method}</td>
                 <td className="px-4 py-3 text-right">{formatCurrency(Number(sale.amount))}</td>
                 <td className="px-4 py-3">
@@ -66,7 +76,7 @@ export default async function VendasPage() {
               </tr>
             ))}
 
-            {(sales ?? []).length === 0 && (
+            {sales.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-ink-500">
                   Nenhuma venda registrada ainda.
