@@ -41,7 +41,21 @@ export default async function ConfiguracoesPage() {
 
       <section>
         <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">Procedimentos</h3>
-        <SimpleRegistrationForm table="procedures" organizationId={organizationId} />
+        <SimpleRegistrationForm
+          table="procedures"
+          organizationId={organizationId}
+          extraFields={[
+            {
+              key: "segment",
+              label: "Segmento",
+              type: "select",
+              options: [
+                { value: "laser", label: "Depilação a Laser" },
+                { value: "estetica", label: "Estética" },
+              ],
+            },
+          ]}
+        />
         <SimpleList items={procedures.map((p) => p.name)} empty="Nenhum procedimento cadastrado." />
       </section>
 

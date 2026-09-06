@@ -1,28 +1,49 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { ClientAutocomplete } from "@/components/client-autocomplete";
 
 type Option = { id: string; name: string };
+type Seller = { id: string; name: string; unit_id: string | null };
+type Procedure = { id: string; name: string; segment: "laser" | "estetica" };
+type Area = { id: string; name: string; group_label: string | null; procedure_id: string | null; segment: string | null };
 
-const PAYMENT_METHODS = ["Dinheiro", "PIX", "Debito", "Credito", "Boleto", "Transferencia"];
-const LEAD_ORIGINS = ["Instagram", "Indicacao", "Google", "WhatsApp", "Passante", "Outros"];
+const LEAD_ORIGINS: { value: string; label: string }[] = [
+  { value: "Anuncio", label: "Anúncio" },
+  { value: "InstagramOrganico", label: "Instagram (Orgânico)" },
+  { value: "ClienteAtivo", label: "Cliente Ativo" },
+  { value: "Indicacao", label: "Indicação" },
+  { value: "Passante", label: "Passante" },
+  { value: "WhatsappReativacao", label: "WhatsApp / Reativação" },
+];
+
+const PAYMENT_METHODS: { value: string; label: string }[] = [
+  { value: "PIX", label: "PIX" },
+  { value: "Credito", label: "Crédito" },
+  { value: "Debito", label: "Débito" },
+  { value: "Dinheiro", label: "Dinheiro" },
+  { value: "LinkPagamento", label: "Link Pagamento" },
+  { value: "BoletoRecorrente", label: "Boleto / Recorrente" },
+];
 
 export function NewSaleForm({
   organizationId,
   userId,
   units,
   clients,
+  sellers,
   procedures,
-  packages,
+  areas,
 }: {
   organizationId: string;
   userId: string;
   units: Option[];
   clients: Option[];
-  procedures: Option[];
-  packages: Option[];
+  sellers: Seller[];
+  procedures: Procedure[];
+  areas: Area[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -30,109 +51,222 @@ export function NewSaleForm({
   const [saleDate, setSaleDate] = useState(new Date().toISOString().slice(0, 10));
   const [unitId, setUnitId] = useState(units[0]?.id ?? "");
   const [clientId, setClientId] = useState("");
+  const [sellerId, setSellerId] = useState("");
+  const [leadOrigin, setLeadOrigin] = useState(LEAD_ORIGINS[0].value);
+
+  const [segment, setSegment] = useState<"laser" | "estetica">("laser");
   const [procedureId, setProcedureId] = useState("");
-  const [packageId, setPackageId] = useState("");
+  const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>([]);
+
   const [amount, setAmount] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[0].value);
   const [installments, setInstallments] = useState(1);
-  const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[0]);
-  const [leadOrigin, setLeadOrigin] = useState(LEAD_ORIGINS[0]);
+  const [transactionCode, setTransactionCode] = useState("");
   const [notes, setNotes] = useState("");
+
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const sellersForUnit = useMemo(
+    () => sellers.filter((s) => !s.unit_id || s.unit_id === unitId),
+    [sellers, unitId]
+  );
+
+  const proceduresForSegment = useMemo(
+    () => procedures.filter((p) => p.segment === segment),
+    [procedures, segment]
+  );
+
+  const areasForSelection = useMemo(() => {
+    if (segment === "laser") return areas.filter((a) => a.segment === "laser");
+    return areas.filter((a) => a.procedure_id === procedureId);
+  }, [areas, segment, procedureId]);
+
+  const laserGroups = useMemo(() => {
+    const groups = new Map<string, Area[]>();
+    for (const a of areasForSelection) {
+      const key = a.group_label ?? "Outros";
+      groups.set(key, [...(groups.get(key) ?? []), a]);
+    }
+    return Array.from(groups.entries());
+  }, [areasForSelection]);
+
+  const needsInstallments = paymentMethod === "Credito" || paymentMethod === "LinkPagamento";
+
+  function handleSegmentChange(next: "laser" | "estetica") {
+    setSegment(next);
+    setProcedureId("");
+    setSelectedAreaIds([]);
+  }
+
+  function toggleArea(areaId: string) {
+    setSelectedAreaIds((prev) =>
+      prev.includes(areaId) ? prev.filter((id) => id !== areaId) : [...prev, areaId]
+    );
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError(null);
 
-    const { error } = await supabase.from("sales").insert({
-      organization_id: organizationId,
-      unit_id: unitId,
-      sale_date: saleDate,
-      client_id: clientId,
-      procedure_id: procedureId || null,
-      package_id: packageId || null,
-      amount: Number(amount.replace(",", ".")),
-      installments,
-      payment_method: paymentMethod as never,
-      lead_origin: leadOrigin as never,
-      seller_id: userId,
-      notes: notes || null,
-      created_by: userId,
-    });
+    const { data: sale, error: saleError } = await supabase
+      .from("sales")
+      .insert({
+        organization_id: organizationId,
+        unit_id: unitId,
+        sale_date: saleDate,
+        client_id: clientId,
+        procedure_id: procedureId || null,
+        amount: Number(amount.replace(",", ".")),
+        installments: needsInstallments ? installments : 1,
+        payment_method: paymentMethod,
+        lead_origin: leadOrigin,
+        seller_id: sellerId,
+        transaction_code: transactionCode || null,
+        notes: notes || null,
+        created_by: userId,
+      })
+      .select("id")
+      .single();
 
-    setSaving(false);
-
-    if (error) {
-      setError(error.message);
+    if (saleError || !sale) {
+      setSaving(false);
+      setError(saleError?.message ?? "Não foi possível salvar a venda.");
       return;
     }
 
+    if (selectedAreaIds.length > 0) {
+      const { error: areasError } = await supabase
+        .from("sale_areas")
+        .insert(selectedAreaIds.map((areaId) => ({ sale_id: sale.id, area_id: areaId })));
+
+      if (areasError) {
+        setSaving(false);
+        setError(`Venda salva, mas houve um erro ao gravar as áreas: ${areasError.message}`);
+        return;
+      }
+    }
+
+    setSaving(false);
     router.push("/vendas");
     router.refresh();
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-2xl space-y-4 rounded-lg border border-gold-100 bg-white p-6">
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Data da venda">
-          <input
-            type="date"
-            required
-            value={saleDate}
-            onChange={(e) => setSaleDate(e.target.value)}
-            className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
-          />
+    <form onSubmit={handleSubmit} className="max-w-3xl space-y-8">
+      <Section title="Identificação do cliente e venda">
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Data da venda">
+            <input
+              type="date"
+              required
+              value={saleDate}
+              onChange={(e) => setSaleDate(e.target.value)}
+              className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+            />
+          </Field>
+
+          <Field label="Unidade">
+            <select
+              required
+              value={unitId}
+              onChange={(e) => {
+                setUnitId(e.target.value);
+                setSellerId("");
+              }}
+              className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+            >
+              {units.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+
+        <Field label="Nome completo do cliente">
+          <ClientAutocomplete clients={clients} value={clientId} onChange={setClientId} />
+          {clients.length === 0 && (
+            <p className="mt-1 text-xs text-ink-500">
+              Nenhum cliente cadastrado ainda. Cadastre em Clientes antes de lançar a venda.
+            </p>
+          )}
         </Field>
 
-        <Field label="Unidade">
-          <select
-            required
-            value={unitId}
-            onChange={(e) => setUnitId(e.target.value)}
-            className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
-          >
-            {units.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Vendedor(a) responsável">
+            <select
+              required
+              value={sellerId}
+              onChange={(e) => setSellerId(e.target.value)}
+              className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+            >
+              <option value="" disabled>
+                Selecione
               </option>
-            ))}
-          </select>
-        </Field>
-      </div>
+              {sellersForUnit.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+            {sellersForUnit.length === 0 && (
+              <p className="mt-1 text-xs text-ink-500">
+                Nenhuma vendedora cadastrada nesta unidade ainda.
+              </p>
+            )}
+          </Field>
 
-      <Field label="Cliente">
-        <select
-          required
-          value={clientId}
-          onChange={(e) => setClientId(e.target.value)}
-          className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
-        >
-          <option value="" disabled>
-            Selecione o cliente
-          </option>
-          {clients.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
+          <Field label="Origem do lead">
+            <select
+              value={leadOrigin}
+              onChange={(e) => setLeadOrigin(e.target.value)}
+              className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+            >
+              {LEAD_ORIGINS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+      </Section>
+
+      <Section title="Procedimento">
+        <div className="flex gap-2">
+          {(["laser", "estetica"] as const).map((seg) => (
+            <button
+              key={seg}
+              type="button"
+              onClick={() => handleSegmentChange(seg)}
+              className={`rounded-md px-4 py-2 text-sm font-medium transition ${
+                segment === seg
+                  ? "bg-gold-500 text-white"
+                  : "border border-gold-200 text-ink-700 hover:bg-gold-50"
+              }`}
+            >
+              {seg === "laser" ? "Depilação a Laser" : "Estética"}
+            </button>
           ))}
-        </select>
-        {clients.length === 0 && (
-          <p className="mt-1 text-xs text-ink-500">
-            Nenhum cliente cadastrado ainda. Cadastre em Clientes antes de lançar a venda.
-          </p>
-        )}
-      </Field>
+        </div>
 
-      <div className="grid grid-cols-2 gap-4">
         <Field label="Procedimento">
           <select
+            required
             value={procedureId}
-            onChange={(e) => setProcedureId(e.target.value)}
+            onChange={(e) => {
+              setProcedureId(e.target.value);
+              setSelectedAreaIds([]);
+            }}
             className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
           >
-            <option value="">Nenhum</option>
-            {procedures.map((p) => (
+            <option value="" disabled>
+              Selecione
+            </option>
+            {proceduresForSegment.map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
@@ -140,85 +274,120 @@ export function NewSaleForm({
           </select>
         </Field>
 
-        <Field label="Pacote">
-          <select
-            value={packageId}
-            onChange={(e) => setPackageId(e.target.value)}
-            className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
-          >
-            <option value="">Nenhum</option>
-            {packages.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
+        {segment === "laser" ? (
+          <div>
+            <p className="mb-2 text-sm text-ink-700">Área / região de aplicação</p>
+            <div className="space-y-3 rounded-md border border-gold-100 bg-white p-4">
+              {laserGroups.map(([group, groupAreas]) => (
+                <div key={group}>
+                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-500">
+                    {group}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {groupAreas.map((a) => (
+                      <label
+                        key={a.id}
+                        className={`cursor-pointer rounded-full border px-3 py-1 text-xs ${
+                          selectedAreaIds.includes(a.id)
+                            ? "border-gold-500 bg-gold-100 text-gold-800"
+                            : "border-gold-200 text-ink-700"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="hidden"
+                          checked={selectedAreaIds.includes(a.id)}
+                          onChange={() => toggleArea(a.id)}
+                        />
+                        {a.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          areasForSelection.length > 0 && (
+            <Field label="Área / região de aplicação">
+              <select
+                value={selectedAreaIds[0] ?? ""}
+                onChange={(e) => setSelectedAreaIds(e.target.value ? [e.target.value] : [])}
+                className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+              >
+                <option value="">Nenhuma</option>
+                {areasForSelection.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )
+        )}
+      </Section>
 
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Valor (R$)">
+      <Section title="Financeiro">
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Valor total (R$)">
+            <input
+              required
+              inputMode="decimal"
+              placeholder="0,00"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+            />
+          </Field>
+
+          <Field label="Forma de pagamento">
+            <select
+              value={paymentMethod}
+              onChange={(e) => setPaymentMethod(e.target.value)}
+              className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+            >
+              {PAYMENT_METHODS.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </Field>
+        </div>
+
+        {needsInstallments && (
+          <Field label="Parcelamento">
+            <select
+              value={installments}
+              onChange={(e) => setInstallments(Number(e.target.value))}
+              className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+            >
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
+                <option key={n} value={n}>
+                  {n}x
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
+
+        <Field label="Código / comprovante (opcional)">
           <input
-            required
-            inputMode="decimal"
-            placeholder="0,00"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
+            value={transactionCode}
+            onChange={(e) => setTransactionCode(e.target.value)}
             className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
           />
         </Field>
 
-        <Field label="Parcelas">
-          <input
-            type="number"
-            min={1}
-            max={18}
-            required
-            value={installments}
-            onChange={(e) => setInstallments(Number(e.target.value))}
+        <Field label="Observações">
+          <textarea
+            rows={2}
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
             className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
           />
         </Field>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <Field label="Forma de pagamento">
-          <select
-            value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value)}
-            className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
-          >
-            {PAYMENT_METHODS.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
-        </Field>
-
-        <Field label="Origem do lead">
-          <select
-            value={leadOrigin}
-            onChange={(e) => setLeadOrigin(e.target.value)}
-            className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
-          >
-            {LEAD_ORIGINS.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
-
-      <Field label="Observação">
-        <textarea
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-          rows={2}
-          className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
-        />
-      </Field>
+      </Section>
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -230,6 +399,15 @@ export function NewSaleForm({
         {saving ? "Salvando..." : "Registrar venda"}
       </button>
     </form>
+  );
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-4 rounded-lg border border-gold-100 bg-white p-6">
+      <h3 className="text-sm font-medium uppercase tracking-wide text-ink-500">{title}</h3>
+      {children}
+    </section>
   );
 }
 

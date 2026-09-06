@@ -18,14 +18,20 @@ export default async function NovaVendaPage() {
 
   const unitsRes = await supabase.from("units").select("id, name").eq("active", true).order("name");
   const clientsRes = await supabase.from("clients").select("id, name").order("name");
-  const proceduresRes = await supabase
-    .from("procedures")
-    .select("id, name")
+  const sellersRes = await supabase
+    .from("sellers")
+    .select("id, name, unit_id")
     .eq("active", true)
     .order("name");
-  const packagesRes = await supabase
-    .from("packages")
-    .select("id, name")
+  const proceduresRes = await supabase
+    .from("procedures")
+    .select("id, name, segment")
+    .eq("active", true)
+    .not("segment", "is", null)
+    .order("name");
+  const areasRes = await supabase
+    .from("procedure_areas")
+    .select("id, name, group_label, procedure_id, segment")
     .eq("active", true)
     .order("name");
 
@@ -37,8 +43,9 @@ export default async function NovaVendaPage() {
         userId={user!.id}
         units={unitsRes.data ?? []}
         clients={clientsRes.data ?? []}
-        procedures={proceduresRes.data ?? []}
-        packages={packagesRes.data ?? []}
+        sellers={sellersRes.data ?? []}
+        procedures={(proceduresRes.data ?? []) as never}
+        areas={areasRes.data ?? []}
       />
     </div>
   );
