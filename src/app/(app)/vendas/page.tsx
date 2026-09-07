@@ -9,22 +9,13 @@ function formatDate(value: string) {
   return new Date(value).toLocaleDateString("pt-BR", { timeZone: "UTC" });
 }
 
-const PAYMENT_LABELS: Record<string, string> = {
-  PIX: "PIX",
-  Credito: "Crédito",
-  Debito: "Débito",
-  Dinheiro: "Dinheiro",
-  LinkPagamento: "Link Pagamento",
-  BoletoRecorrente: "Boleto / Recorrente",
-};
-
 export default async function VendasPage() {
   const supabase = createClient();
 
   const { data: salesRaw } = await supabase
     .from("sales")
     .select(
-      "id, sale_date, amount, payment_method, status, tipo_venda, clients(name), sellers(name), procedures(name, segment)"
+      "id, sale_date, amount, status, tipo_venda, clients(name), sellers(name), procedures(name, segment), payment_methods(name)"
     )
     .order("sale_date", { ascending: false })
     .limit(50);
@@ -33,12 +24,12 @@ export default async function VendasPage() {
     id: string;
     sale_date: string;
     amount: number;
-    payment_method: string;
     status: string;
     tipo_venda: string | null;
     clients: { name: string } | null;
     sellers: { name: string } | null;
     procedures: { name: string; segment: string | null } | null;
+    payment_methods: { name: string } | null;
   };
 
   const sales = (salesRaw ?? []) as unknown as SaleRow[];
@@ -80,7 +71,7 @@ export default async function VendasPage() {
                   {sale.procedures?.segment === "laser" ? "Laser" : sale.procedures?.segment === "estetica" ? "Estética" : "-"}
                 </td>
                 <td className="px-4 py-3">{sale.procedures?.name ?? "-"}</td>
-                <td className="px-4 py-3">{PAYMENT_LABELS[sale.payment_method] ?? sale.payment_method}</td>
+                <td className="px-4 py-3">{sale.payment_methods?.name ?? "-"}</td>
                 <td className="px-4 py-3">{sale.tipo_venda ?? "-"}</td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">{formatCurrency(Number(sale.amount))}</td>
                 <td className="px-4 py-3">

@@ -9,24 +9,7 @@ type Option = { id: string; name: string };
 type Seller = { id: string; name: string; unit_id: string | null };
 type Procedure = { id: string; name: string; segment: "laser" | "estetica" };
 type Area = { id: string; name: string; group_label: string | null; procedure_id: string | null; segment: string | null };
-
-const LEAD_ORIGINS: { value: string; label: string }[] = [
-  { value: "Anuncio", label: "Anúncio" },
-  { value: "InstagramOrganico", label: "Instagram (Orgânico)" },
-  { value: "ClienteAtivo", label: "Cliente Ativo" },
-  { value: "Indicacao", label: "Indicação" },
-  { value: "Passante", label: "Passante" },
-  { value: "WhatsappReativacao", label: "WhatsApp / Reativação" },
-];
-
-const PAYMENT_METHODS: { value: string; label: string }[] = [
-  { value: "PIX", label: "PIX" },
-  { value: "Credito", label: "Crédito" },
-  { value: "Debito", label: "Débito" },
-  { value: "Dinheiro", label: "Dinheiro" },
-  { value: "LinkPagamento", label: "Link Pagamento" },
-  { value: "BoletoRecorrente", label: "Boleto / Recorrente" },
-];
+type CatalogItem = { id: string; name: string; code: string };
 
 export function NewSaleForm({
   organizationId,
@@ -36,6 +19,8 @@ export function NewSaleForm({
   sellers,
   procedures,
   areas,
+  paymentMethods,
+  leadOrigins,
 }: {
   organizationId: string;
   userId: string;
@@ -44,6 +29,8 @@ export function NewSaleForm({
   sellers: Seller[];
   procedures: Procedure[];
   areas: Area[];
+  paymentMethods: CatalogItem[];
+  leadOrigins: CatalogItem[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -52,14 +39,14 @@ export function NewSaleForm({
   const [unitId, setUnitId] = useState(units[0]?.id ?? "");
   const [clientId, setClientId] = useState("");
   const [sellerId, setSellerId] = useState("");
-  const [leadOrigin, setLeadOrigin] = useState(LEAD_ORIGINS[0].value);
+  const [leadOriginId, setLeadOriginId] = useState(leadOrigins[0]?.id ?? "");
 
   const [segment, setSegment] = useState<"laser" | "estetica">("laser");
   const [procedureId, setProcedureId] = useState("");
   const [selectedAreaIds, setSelectedAreaIds] = useState<string[]>([]);
 
   const [amount, setAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState(PAYMENT_METHODS[0].value);
+  const [paymentMethodId, setPaymentMethodId] = useState(paymentMethods[0]?.id ?? "");
   const [installments, setInstallments] = useState(1);
   const [transactionCode, setTransactionCode] = useState("");
   const [notes, setNotes] = useState("");
@@ -82,16 +69,18 @@ export function NewSaleForm({
     return areas.filter((a) => a.procedure_id === procedureId);
   }, [areas, segment, procedureId]);
 
-  const laserGroups = useMemo(() => {
+  const groupedAreas = useMemo(() => {
     const groups = new Map<string, Area[]>();
     for (const a of areasForSelection) {
-      const key = a.group_label ?? "Outros";
+      const key = a.group_label ?? "Geral";
       groups.set(key, [...(groups.get(key) ?? []), a]);
     }
     return Array.from(groups.entries());
   }, [areasForSelection]);
 
-  const needsInstallments = paymentMethod === "Credito" || paymentMethod === "LinkPagamento";
+  const selectedPaymentMethod = paymentMethods.find((p) => p.id === paymentMethodId);
+  const needsInstallments =
+    selectedPaymentMethod?.code === "credito" || selectedPaymentMethod?.code === "link_pagamento";
 
   function handleSegmentChange(next: "laser" | "estetica") {
     setSegment(next);
@@ -120,8 +109,8 @@ export function NewSaleForm({
         procedure_id: procedureId || null,
         amount: Number(amount.replace(",", ".")),
         installments: needsInstallments ? installments : 1,
-        payment_method: paymentMethod,
-        lead_origin: leadOrigin,
+        payment_method_id: paymentMethodId,
+        lead_origin_id: leadOriginId,
         seller_id: sellerId,
         transaction_code: transactionCode || null,
         notes: notes || null,
@@ -187,12 +176,12 @@ export function NewSaleForm({
         </div>
 
         <Field label="Nome completo do cliente">
-          <ClientAutocomplete clients={clients} value={clientId} onChange={setClientId} />
-          {clients.length === 0 && (
-            <p className="mt-1 text-xs text-ink-500">
-              Nenhum cliente cadastrado ainda. Cadastre em Clientes antes de lançar a venda.
-            </p>
-          )}
+          <ClientAutocomplete
+            clients={clients}
+            organizationId={organizationId}
+            value={clientId}
+            onChange={setClientId}
+          />
         </Field>
 
         <div className="grid grid-cols-2 gap-4">
@@ -214,20 +203,20 @@ export function NewSaleForm({
             </select>
             {sellersForUnit.length === 0 && (
               <p className="mt-1 text-xs text-ink-500">
-                Nenhuma vendedora cadastrada nesta unidade ainda.
+                Nenhuma vendedora cadastrada nesta unidade ainda. Cadastre em Configurações.
               </p>
             )}
           </Field>
 
           <Field label="Origem do lead">
             <select
-              value={leadOrigin}
-              onChange={(e) => setLeadOrigin(e.target.value)}
+              value={leadOriginId}
+              onChange={(e) => setLeadOriginId(e.target.value)}
               className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
             >
-              {LEAD_ORIGINS.map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
+              {leadOrigins.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
                 </option>
               ))}
             </select>
@@ -235,23 +224,25 @@ export function NewSaleForm({
         </div>
       </Section>
 
-      <Section title="Procedimento">
-        <div className="flex gap-2">
-          {(["laser", "estetica"] as const).map((seg) => (
-            <button
-              key={seg}
-              type="button"
-              onClick={() => handleSegmentChange(seg)}
-              className={`rounded-md px-4 py-2 text-sm font-medium transition ${
-                segment === seg
-                  ? "bg-gold-500 text-white"
-                  : "border border-gold-200 text-ink-700 hover:bg-gold-50"
-              }`}
-            >
-              {seg === "laser" ? "Depilação a Laser" : "Estética"}
-            </button>
-          ))}
-        </div>
+      <Section title="Segmento e procedimento">
+        <Field label="Segmento">
+          <div className="flex gap-2">
+            {(["laser", "estetica"] as const).map((seg) => (
+              <button
+                key={seg}
+                type="button"
+                onClick={() => handleSegmentChange(seg)}
+                className={`rounded-md px-4 py-2 text-sm font-medium transition ${
+                  segment === seg
+                    ? "bg-gold-500 text-white"
+                    : "border border-gold-200 text-ink-700 hover:bg-gold-50"
+                }`}
+              >
+                {seg === "laser" ? "Depilação a Laser" : "Estética"}
+              </button>
+            ))}
+          </div>
+        </Field>
 
         <Field label="Procedimento">
           <select
@@ -278,7 +269,7 @@ export function NewSaleForm({
           <div>
             <p className="mb-2 text-sm text-ink-700">Área / região de aplicação</p>
             <div className="space-y-3 rounded-md border border-gold-100 bg-white p-4">
-              {laserGroups.map(([group, groupAreas]) => (
+              {groupedAreas.map(([group, groupAreas]) => (
                 <div key={group}>
                   <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-500">
                     {group}
@@ -316,10 +307,14 @@ export function NewSaleForm({
                 className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
               >
                 <option value="">Nenhuma</option>
-                {areasForSelection.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.name}
-                  </option>
+                {groupedAreas.map(([group, groupAreas]) => (
+                  <optgroup key={group} label={group}>
+                    {groupAreas.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </Field>
@@ -342,13 +337,13 @@ export function NewSaleForm({
 
           <Field label="Forma de pagamento">
             <select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
+              value={paymentMethodId}
+              onChange={(e) => setPaymentMethodId(e.target.value)}
               className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
             >
-              {PAYMENT_METHODS.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
+              {paymentMethods.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.name}
                 </option>
               ))}
             </select>
@@ -393,7 +388,7 @@ export function NewSaleForm({
 
       <button
         type="submit"
-        disabled={saving || clients.length === 0}
+        disabled={saving}
         className="rounded-md bg-gold-500 px-6 py-2 text-sm font-medium text-white hover:bg-gold-600 disabled:opacity-60"
       >
         {saving ? "Salvando..." : "Registrar venda"}

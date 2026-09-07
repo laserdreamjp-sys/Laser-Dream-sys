@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { SimpleRegistrationForm } from "@/components/simple-registration-form";
+import { ManageableList } from "@/components/manageable-list";
 
 export default async function ConfiguracoesPage() {
   const supabase = createClient();
@@ -15,25 +15,32 @@ export default async function ConfiguracoesPage() {
     .single();
 
   const profile = profileRaw as { organization_id: string } | null;
-
   const organizationId = profile!.organization_id;
 
   const proceduresRes = await supabase
     .from("procedures")
-    .select("id, name, category, active")
+    .select("id, name, segment, active")
     .order("name");
-  const packagesRes = await supabase
-    .from("packages")
-    .select("id, name, description, active")
+  const sellersRes = await supabase
+    .from("sellers")
+    .select("id, name, unit_id, active")
+    .order("name");
+  const unitsRes = await supabase.from("units").select("id, name").eq("active", true).order("name");
+  const paymentMethodsRes = await supabase
+    .from("payment_methods")
+    .select("id, name, code, active")
+    .order("name");
+  const leadOriginsRes = await supabase
+    .from("lead_origins")
+    .select("id, name, code, active")
     .order("name");
   const categoriesRes = await supabase
     .from("cash_categories")
     .select("id, name, type, active")
     .order("name");
 
-  const procedures = proceduresRes.data ?? [];
-  const packages = packagesRes.data ?? [];
-  const categories = categoriesRes.data ?? [];
+  const units = unitsRes.data ?? [];
+  const unitOptions = [{ value: "", label: "Sem unidade fixa" }, ...units.map((u) => ({ value: u.id, label: u.name }))];
 
   return (
     <div className="space-y-10">
@@ -41,10 +48,12 @@ export default async function ConfiguracoesPage() {
 
       <section>
         <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">Procedimentos</h3>
-        <SimpleRegistrationForm
+        <ManageableList
           table="procedures"
           organizationId={organizationId}
-          extraFields={[
+          items={proceduresRes.data ?? []}
+          fields={[
+            { key: "name", label: "Nome", type: "text" },
             {
               key: "segment",
               label: "Segmento",
@@ -56,23 +65,59 @@ export default async function ConfiguracoesPage() {
             },
           ]}
         />
-        <SimpleList items={procedures.map((p) => p.name)} empty="Nenhum procedimento cadastrado." />
       </section>
 
       <section>
-        <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">Pacotes</h3>
-        <SimpleRegistrationForm table="packages" organizationId={organizationId} />
-        <SimpleList items={packages.map((p) => p.name)} empty="Nenhum pacote cadastrado." />
+        <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">Vendedoras</h3>
+        <ManageableList
+          table="sellers"
+          organizationId={organizationId}
+          items={sellersRes.data ?? []}
+          fields={[
+            { key: "name", label: "Nome", type: "text" },
+            { key: "unit_id", label: "Unidade", type: "select", options: unitOptions },
+          ]}
+        />
+      </section>
+
+      <section>
+        <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">
+          Formas de pagamento
+        </h3>
+        <ManageableList
+          table="payment_methods"
+          organizationId={organizationId}
+          items={paymentMethodsRes.data ?? []}
+          fields={[{ key: "name", label: "Nome", type: "text" }]}
+        />
+        <p className="mt-1 text-xs text-ink-500">
+          O item com código de Dinheiro gera entrada automática no caixa; o de Boleto/Recorrente
+          entra na classificação Recorrente. Renomear o texto é seguro, o comportamento não muda.
+        </p>
+      </section>
+
+      <section>
+        <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">
+          Origem do lead
+        </h3>
+        <ManageableList
+          table="lead_origins"
+          organizationId={organizationId}
+          items={leadOriginsRes.data ?? []}
+          fields={[{ key: "name", label: "Nome", type: "text" }]}
+        />
       </section>
 
       <section>
         <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">
           Categorias de caixa
         </h3>
-        <SimpleRegistrationForm
+        <ManageableList
           table="cash_categories"
           organizationId={organizationId}
-          extraFields={[
+          items={categoriesRes.data ?? []}
+          fields={[
+            { key: "name", label: "Nome", type: "text" },
             {
               key: "type",
               label: "Tipo",
@@ -84,27 +129,7 @@ export default async function ConfiguracoesPage() {
             },
           ]}
         />
-        <SimpleList
-          items={categories.map((c) => `${c.name} (${c.type})`)}
-          empty="Nenhuma categoria cadastrada."
-        />
       </section>
     </div>
-  );
-}
-
-function SimpleList({ items, empty }: { items: string[]; empty: string }) {
-  if (items.length === 0) {
-    return <p className="text-sm text-ink-500">{empty}</p>;
-  }
-
-  return (
-    <ul className="divide-y divide-gold-50 rounded-lg border border-gold-100 bg-white text-sm">
-      {items.map((item, i) => (
-        <li key={i} className="px-4 py-2">
-          {item}
-        </li>
-      ))}
-    </ul>
   );
 }
