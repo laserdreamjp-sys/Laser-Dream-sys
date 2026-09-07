@@ -52,7 +52,7 @@ export default async function UsuariosPage() {
       <NewInviteForm organizationId={organizationId} roles={rolesRes.data ?? []} units={unitsRes.data ?? []} />
 
       <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">Equipe</h3>
-      <div className="mb-8 overflow-hidden rounded-lg border border-gold-100 bg-white">
+      <div className="mb-8 overflow-x-auto rounded-lg border border-gold-100 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-gold-50 text-left text-xs uppercase tracking-wide text-ink-500">
             <tr>
@@ -78,7 +78,7 @@ export default async function UsuariosPage() {
       <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">
         Convites pendentes
       </h3>
-      <div className="overflow-hidden rounded-lg border border-gold-100 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-gold-100 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-gold-50 text-left text-xs uppercase tracking-wide text-ink-500">
             <tr>

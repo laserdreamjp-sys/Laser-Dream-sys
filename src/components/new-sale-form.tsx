@@ -145,7 +145,7 @@ export function NewSaleForm({
   return (
     <form onSubmit={handleSubmit} className="max-w-3xl space-y-8">
       <Section title="Identificação do cliente e venda">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Data da venda">
             <input
               type="date"
@@ -184,7 +184,7 @@ export function NewSaleForm({
           />
         </Field>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Vendedor(a) responsável">
             <select
               required
@@ -323,7 +323,7 @@ export function NewSaleForm({
       </Section>
 
       <Section title="Financeiro">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Valor total (R$)">
             <input
               required

@@ -70,7 +70,7 @@ export default async function CaixaPage() {
         categories={categoriesRes.data ?? []}
       />
 
-      <div className="overflow-hidden rounded-lg border border-gold-100 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-gold-100 bg-white">
         <table className="w-full text-sm">
           <thead className="bg-gold-50 text-left text-xs uppercase tracking-wide text-ink-500">
             <tr>

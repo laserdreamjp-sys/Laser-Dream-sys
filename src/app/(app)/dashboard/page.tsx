@@ -117,7 +117,7 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-lg border border-gold-100 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-gold-100 bg-white">
         <p className="border-b border-gold-100 px-4 py-3 text-sm font-medium text-ink-700">
           Desempenho por vendedora
         </p>
