@@ -24,11 +24,15 @@ function displayValue(item: Item, field: FieldConfig) {
 export function ManageableList({
   table,
   organizationId,
+  userId,
+  canWrite,
   items,
   fields,
 }: {
   table: string;
   organizationId: string;
+  userId: string;
+  canWrite: boolean;
   items: Item[];
   fields: FieldConfig[];
 }) {
@@ -42,6 +46,7 @@ export function ManageableList({
   const [editItem, setEditItem] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault();
@@ -65,11 +70,32 @@ export function ManageableList({
     setError(null);
   }
 
-  async function handleSaveEdit(id: string) {
+  async function handleSaveEdit(item: Item) {
     setSaving(true);
     setError(null);
+    setNotice(null);
 
-    const { error } = await supabase.from(table).update(editItem).eq("id", id);
+    if (canWrite) {
+      const { error } = await supabase.from(table).update(editItem).eq("id", item.id);
+      setSaving(false);
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      setEditingId(null);
+      router.refresh();
+      return;
+    }
+
+    const { error } = await supabase.from("change_requests").insert({
+      organization_id: organizationId,
+      table_name: table,
+      record_id: item.id,
+      record_label: String(item[fields[0].key] ?? ""),
+      action: "edit",
+      payload: editItem,
+      requested_by: userId,
+    });
 
     setSaving(false);
     if (error) {
@@ -77,32 +103,73 @@ export function ManageableList({
       return;
     }
     setEditingId(null);
-    router.refresh();
+    setNotice("Solicitação de alteração enviada ao administrador.");
   }
 
   async function handleToggleActive(item: Item) {
     setError(null);
-    const { error } = await supabase.from(table).update({ active: !item.active }).eq("id", item.id);
+    setNotice(null);
+
+    if (canWrite) {
+      const { error } = await supabase.from(table).update({ active: !item.active }).eq("id", item.id);
+      if (error) {
+        setError(error.message);
+        return;
+      }
+      router.refresh();
+      return;
+    }
+
+    const { error } = await supabase.from("change_requests").insert({
+      organization_id: organizationId,
+      table_name: table,
+      record_id: item.id,
+      record_label: String(item[fields[0].key] ?? ""),
+      action: "edit",
+      payload: { active: !item.active },
+      requested_by: userId,
+    });
     if (error) {
       setError(error.message);
       return;
     }
-    router.refresh();
+    setNotice("Solicitação enviada ao administrador.");
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Excluir este item? Não será possível desfazer.")) return;
-    setError(null);
-    const { error } = await supabase.from(table).delete().eq("id", id);
-    if (error) {
-      setError(
-        error.message.includes("foreign key")
-          ? "Não é possível excluir: existem registros usando este item. Desative em vez de excluir."
-          : error.message
-      );
+  async function handleDelete(item: Item) {
+    if (!confirm(canWrite ? "Excluir este item? Não será possível desfazer." : "Solicitar exclusão deste item?")) {
       return;
     }
-    router.refresh();
+    setError(null);
+    setNotice(null);
+
+    if (canWrite) {
+      const { error } = await supabase.from(table).delete().eq("id", item.id);
+      if (error) {
+        setError(
+          error.message.includes("foreign key")
+            ? "Não é possível excluir: existem registros usando este item. Desative em vez de excluir."
+            : error.message
+        );
+        return;
+      }
+      router.refresh();
+      return;
+    }
+
+    const { error } = await supabase.from("change_requests").insert({
+      organization_id: organizationId,
+      table_name: table,
+      record_id: item.id,
+      record_label: String(item[fields[0].key] ?? ""),
+      action: "delete",
+      requested_by: userId,
+    });
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setNotice("Solicitação de exclusão enviada ao administrador.");
   }
 
   return (
@@ -147,6 +214,7 @@ export function ManageableList({
       </form>
 
       {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
+      {notice && <p className="mb-3 text-sm text-gold-700">{notice}</p>}
 
       <ul className="divide-y divide-gold-50 rounded-lg border border-gold-100 bg-white text-sm">
         {items.map((item) => (
@@ -177,11 +245,11 @@ export function ManageableList({
                   )
                 )}
                 <button
-                  onClick={() => handleSaveEdit(item.id)}
+                  onClick={() => handleSaveEdit(item)}
                   disabled={saving}
                   className="rounded-md bg-gold-500 px-3 py-1 text-xs font-medium text-white hover:bg-gold-600"
                 >
-                  Salvar
+                  {canWrite ? "Salvar" : "Enviar solicitação"}
                 </button>
                 <button
                   onClick={() => setEditingId(null)}
@@ -204,19 +272,19 @@ export function ManageableList({
                   onClick={() => handleToggleActive(item)}
                   className="text-xs text-ink-500 underline underline-offset-2"
                 >
-                  {item.active === false ? "Ativar" : "Desativar"}
+                  {item.active === false ? (canWrite ? "Ativar" : "Solicitar ativação") : canWrite ? "Desativar" : "Solicitar desativação"}
                 </button>
                 <button
                   onClick={() => startEdit(item)}
                   className="text-xs text-gold-700 underline underline-offset-2"
                 >
-                  Editar
+                  {canWrite ? "Editar" : "Solicitar edição"}
                 </button>
                 <button
-                  onClick={() => handleDelete(item.id)}
+                  onClick={() => handleDelete(item)}
                   className="text-xs text-destructive underline underline-offset-2"
                 >
-                  Excluir
+                  {canWrite ? "Excluir" : "Solicitar exclusão"}
                 </button>
               </>
             )}

@@ -1,21 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/current-profile";
 import { ManageableList } from "@/components/manageable-list";
 
 export default async function ConfiguracoesPage() {
   const supabase = createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  const { data: profileRaw } = await supabase
-    .from("profiles")
-    .select("organization_id")
-    .eq("id", user!.id)
-    .single();
-
-  const profile = profileRaw as { organization_id: string } | null;
-  const organizationId = profile!.organization_id;
+  const { organizationId, userId, isAdmin } = await getCurrentProfile();
 
   const proceduresRes = await supabase
     .from("procedures")
@@ -44,13 +33,22 @@ export default async function ConfiguracoesPage() {
 
   return (
     <div className="space-y-10">
-      <h2 className="font-serif text-2xl text-ink-900">Configurações</h2>
+      <div>
+        <h2 className="font-serif text-2xl text-ink-900">Configurações</h2>
+        {!isAdmin && (
+          <p className="mt-1 text-sm text-ink-500">
+            Edições e exclusões aqui viram solicitação para o administrador aprovar.
+          </p>
+        )}
+      </div>
 
       <section>
         <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">Procedimentos</h3>
         <ManageableList
           table="procedures"
           organizationId={organizationId}
+          userId={userId}
+          canWrite={isAdmin}
           items={proceduresRes.data ?? []}
           fields={[
             { key: "name", label: "Nome", type: "text" },
@@ -72,6 +70,8 @@ export default async function ConfiguracoesPage() {
         <ManageableList
           table="sellers"
           organizationId={organizationId}
+          userId={userId}
+          canWrite={isAdmin}
           items={sellersRes.data ?? []}
           fields={[
             { key: "name", label: "Nome", type: "text" },
@@ -87,6 +87,8 @@ export default async function ConfiguracoesPage() {
         <ManageableList
           table="payment_methods"
           organizationId={organizationId}
+          userId={userId}
+          canWrite={isAdmin}
           items={paymentMethodsRes.data ?? []}
           fields={[{ key: "name", label: "Nome", type: "text" }]}
         />
@@ -103,6 +105,8 @@ export default async function ConfiguracoesPage() {
         <ManageableList
           table="lead_origins"
           organizationId={organizationId}
+          userId={userId}
+          canWrite={isAdmin}
           items={leadOriginsRes.data ?? []}
           fields={[{ key: "name", label: "Nome", type: "text" }]}
         />
@@ -115,6 +119,8 @@ export default async function ConfiguracoesPage() {
         <ManageableList
           table="cash_categories"
           organizationId={organizationId}
+          userId={userId}
+          canWrite={isAdmin}
           items={categoriesRes.data ?? []}
           fields={[
             { key: "name", label: "Nome", type: "text" },
