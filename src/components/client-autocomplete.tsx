@@ -21,8 +21,14 @@ export function ClientAutocomplete({
   const supabase = createClient();
   const [query, setQuery] = useState(() => clients.find((c) => c.id === value)?.name ?? "");
   const [open, setOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
   const [localClients, setLocalClients] = useState(clients);
+
+  const [showModal, setShowModal] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newPhone, setNewPhone] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   const matches = useMemo(() => {
     if (!query.trim()) return localClients.slice(0, 8);
@@ -32,21 +38,42 @@ export function ClientAutocomplete({
 
   const showCreateOption = query.trim().length >= 4 && matches.length === 0;
 
-  async function handleCreate() {
+  function openCreateModal() {
+    setNewName(query.trim());
+    setNewPhone("");
+    setNewEmail("");
+    setCreateError(null);
+    setShowModal(true);
+    setOpen(false);
+  }
+
+  async function handleConfirmCreate(e: React.FormEvent) {
+    e.preventDefault();
     setCreating(true);
+    setCreateError(null);
+
     const { data, error } = await supabase
       .from("clients")
-      .insert({ organization_id: organizationId, name: query.trim() })
+      .insert({
+        organization_id: organizationId,
+        name: newName.trim(),
+        phone: newPhone || null,
+        email: newEmail || null,
+      })
       .select("id, name")
       .single();
+
     setCreating(false);
 
-    if (error || !data) return;
+    if (error || !data) {
+      setCreateError(error?.message ?? "Não foi possível cadastrar o cliente.");
+      return;
+    }
 
     setLocalClients((prev) => [...prev, data]);
     onChange(data.id);
     setQuery(data.name);
-    setOpen(false);
+    setShowModal(false);
     onCreated?.(data);
   }
 
@@ -82,13 +109,68 @@ export function ClientAutocomplete({
           ))}
           {showCreateOption && (
             <li
-              onMouseDown={handleCreate}
+              onMouseDown={openCreateModal}
               className="cursor-pointer px-3 py-2 text-sm font-medium text-gold-700 hover:bg-gold-50"
             >
-              {creating ? "Cadastrando..." : `+ Cadastrar "${query.trim()}" como novo cliente`}
+              {`+ Cadastrar "${query.trim()}" como novo cliente`}
             </li>
           )}
         </ul>
+      )}
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
+          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
+            <h3 className="mb-4 font-serif text-lg text-ink-900">Novo cliente</h3>
+            <form onSubmit={handleConfirmCreate} className="space-y-3">
+              <div>
+                <label className="mb-1 block text-sm text-ink-700">Nome</label>
+                <input
+                  required
+                  value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
+                  className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-ink-700">Telefone (opcional)</label>
+                <input
+                  value={newPhone}
+                  onChange={(e) => setNewPhone(e.target.value)}
+                  className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-ink-700">E-mail (opcional)</label>
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+                />
+              </div>
+
+              {createError && <p className="text-sm text-destructive">{createError}</p>}
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="rounded-md border border-gold-200 px-4 py-2 text-sm text-ink-700 hover:bg-gold-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={creating}
+                  className="rounded-md bg-gold-500 px-4 py-2 text-sm font-medium text-white hover:bg-gold-600 disabled:opacity-60"
+                >
+                  {creating ? "Salvando..." : "Cadastrar"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
