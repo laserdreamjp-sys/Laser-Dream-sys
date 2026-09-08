@@ -113,7 +113,7 @@ export function RequestActions({ request, userId }: { request: ChangeRequest; us
         <button
           onClick={handleReject}
           disabled={busy}
-          className="rounded-md border border-gold-200 px-3 py-1 text-xs text-ink-700 hover:bg-gold-50 disabled:opacity-60"
+          className="rounded-md border border-border px-3 py-1 text-xs text-foreground hover:bg-muted disabled:opacity-60"
         >
           Rejeitar
         </button>

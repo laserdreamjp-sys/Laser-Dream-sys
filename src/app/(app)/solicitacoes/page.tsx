@@ -30,11 +30,11 @@ export default async function SolicitacoesPage() {
 
     return (
       <div>
-        <h2 className="mb-2 font-serif text-2xl text-ink-900">Minhas solicitações</h2>
-        <p className="mb-6 text-sm text-ink-500">
+        <h2 className="mb-2 font-display font-semibold text-2xl text-foreground">Minhas solicitações</h2>
+        <p className="mb-6 text-sm text-muted-foreground">
           Pedidos de alteração ou exclusão enviados ao administrador.
         </p>
-        <ul className="divide-y divide-gold-50 rounded-lg border border-gold-100 bg-white text-sm">
+        <ul className="divide-y divide-gold-50 rounded-lg border border-border bg-surface text-sm">
           {mine.map((req) => (
             <li key={req.id} className="flex items-center justify-between px-4 py-3">
               <span>
@@ -48,7 +48,7 @@ export default async function SolicitacoesPage() {
                     ? "text-gold-700"
                     : req.status === "rejeitada"
                     ? "text-destructive"
-                    : "text-ink-500"
+                    : "text-muted-foreground"
                 }
               >
                 {req.status}
@@ -56,7 +56,7 @@ export default async function SolicitacoesPage() {
             </li>
           ))}
           {mine.length === 0 && (
-            <li className="px-4 py-8 text-center text-ink-500">Você ainda não fez nenhuma solicitação.</li>
+            <li className="px-4 py-8 text-center text-muted-foreground">Você ainda não fez nenhuma solicitação.</li>
           )}
         </ul>
       </div>
@@ -93,55 +93,55 @@ export default async function SolicitacoesPage() {
   return (
     <div className="space-y-10">
       <div>
-        <h2 className="font-serif text-2xl text-ink-900">Solicitações</h2>
-        <p className="text-sm text-ink-500">Alterações e exclusões pedidas pela equipe, aguardando aprovação.</p>
+        <h2 className="font-display font-semibold text-2xl text-foreground">Solicitações</h2>
+        <p className="text-sm text-muted-foreground">Alterações e exclusões pedidas pela equipe, aguardando aprovação.</p>
       </div>
 
       <section>
-        <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">Pendentes</h3>
-        <ul className="divide-y divide-gold-50 rounded-lg border border-gold-100 bg-white text-sm">
+        <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">Pendentes</h3>
+        <ul className="divide-y divide-gold-50 rounded-lg border border-border bg-surface text-sm">
           {pending.map((req) => (
             <li key={req.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
               <div className="flex-1">
-                <p className="text-ink-900">
+                <p className="text-foreground">
                   <span className="font-medium">{req.profiles?.full_name}</span> pediu{" "}
                   {req.action === "delete" ? "exclusão" : "alteração"} de{" "}
                   {TABLE_LABELS[req.table_name] ?? req.table_name}
                   {req.record_label ? ` — ${req.record_label}` : ""}
                 </p>
                 {req.action === "edit" && req.payload && (
-                  <p className="mt-1 text-xs text-ink-500">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Novo(s) valor(es): {JSON.stringify(req.payload)}
                   </p>
                 )}
-                <p className="mt-1 text-xs text-ink-500">{formatDateTime(req.requested_at)}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(req.requested_at)}</p>
               </div>
               <RequestActions request={req} userId={userId} />
             </li>
           ))}
           {pending.length === 0 && (
-            <li className="px-4 py-8 text-center text-ink-500">Nenhuma solicitação pendente.</li>
+            <li className="px-4 py-8 text-center text-muted-foreground">Nenhuma solicitação pendente.</li>
           )}
         </ul>
       </section>
 
       <section>
-        <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">Histórico recente</h3>
-        <ul className="divide-y divide-gold-50 rounded-lg border border-gold-100 bg-white text-sm">
+        <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">Histórico recente</h3>
+        <ul className="divide-y divide-gold-50 rounded-lg border border-border bg-surface text-sm">
           {resolved.map((req) => (
             <li key={req.id} className="px-4 py-2">
               <span className="font-medium">{req.profiles?.full_name}</span> pediu{" "}
               {req.action === "delete" ? "exclusão" : "alteração"} de{" "}
               {TABLE_LABELS[req.table_name] ?? req.table_name}
               {req.record_label ? ` — ${req.record_label}` : ""} ·{" "}
-              <span className={req.status === "aprovada" ? "text-gold-700" : "text-ink-500"}>
+              <span className={req.status === "aprovada" ? "text-gold-700" : "text-muted-foreground"}>
                 {req.status}
               </span>{" "}
               em {formatDateTime(req.resolved_at)}
             </li>
           ))}
           {resolved.length === 0 && (
-            <li className="px-4 py-6 text-center text-ink-500">Nenhum histórico ainda.</li>
+            <li className="px-4 py-6 text-center text-muted-foreground">Nenhum histórico ainda.</li>
           )}
         </ul>
       </section>

@@ -174,7 +174,7 @@ export function ManageableList({
 
   return (
     <div>
-      <form onSubmit={handleAdd} className="mb-3 flex flex-wrap items-start gap-3 rounded-lg border border-gold-100 bg-white p-4">
+      <form onSubmit={handleAdd} className="mb-3 flex flex-wrap items-start gap-3 rounded-lg border border-border bg-surface p-4">
         {fields.map((field) =>
           field.type === "select" ? (
             <select
@@ -182,7 +182,7 @@ export function ManageableList({
               required
               value={newItem[field.key]}
               onChange={(e) => setNewItem((prev) => ({ ...prev, [field.key]: e.target.value }))}
-              className="rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+              className="rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
             >
               <option value="" disabled>
                 {field.label}
@@ -200,7 +200,7 @@ export function ManageableList({
               placeholder={field.label}
               value={newItem[field.key]}
               onChange={(e) => setNewItem((prev) => ({ ...prev, [field.key]: e.target.value }))}
-              className="min-w-[160px] flex-1 rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+              className="min-w-[160px] flex-1 rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
             />
           )
         )}
@@ -216,7 +216,7 @@ export function ManageableList({
       {error && <p className="mb-3 text-sm text-destructive">{error}</p>}
       {notice && <p className="mb-3 text-sm text-gold-700">{notice}</p>}
 
-      <ul className="divide-y divide-gold-50 rounded-lg border border-gold-100 bg-white text-sm">
+      <ul className="divide-y divide-gold-50 rounded-lg border border-border bg-surface text-sm">
         {items.map((item) => (
           <li key={item.id} className="flex flex-wrap items-center gap-3 px-4 py-2">
             {editingId === item.id ? (
@@ -227,7 +227,7 @@ export function ManageableList({
                       key={field.key}
                       value={editItem[field.key]}
                       onChange={(e) => setEditItem((prev) => ({ ...prev, [field.key]: e.target.value }))}
-                      className="rounded-md border border-gold-200 px-2 py-1 text-sm outline-none focus:border-gold-500"
+                      className="rounded-md border border-border px-2 py-1 text-sm outline-none focus:border-gold-500"
                     >
                       {field.options?.map((opt) => (
                         <option key={opt.value} value={opt.value}>
@@ -240,7 +240,7 @@ export function ManageableList({
                       key={field.key}
                       value={editItem[field.key]}
                       onChange={(e) => setEditItem((prev) => ({ ...prev, [field.key]: e.target.value }))}
-                      className="min-w-[140px] flex-1 rounded-md border border-gold-200 px-2 py-1 text-sm outline-none focus:border-gold-500"
+                      className="min-w-[140px] flex-1 rounded-md border border-border px-2 py-1 text-sm outline-none focus:border-gold-500"
                     />
                   )
                 )}
@@ -253,7 +253,7 @@ export function ManageableList({
                 </button>
                 <button
                   onClick={() => setEditingId(null)}
-                  className="text-xs text-ink-500 underline underline-offset-2"
+                  className="text-xs text-muted-foreground underline underline-offset-2"
                 >
                   Cancelar
                 </button>
@@ -262,7 +262,7 @@ export function ManageableList({
               <>
                 <div className="flex-1">
                   {fields.map((f, i) => (
-                    <span key={f.key} className={item.active === false ? "text-ink-300 line-through" : ""}>
+                    <span key={f.key} className={item.active === false ? "text-muted-foreground line-through" : ""}>
                       {displayValue(item, f)}
                       {i < fields.length - 1 ? " · " : ""}
                     </span>
@@ -270,7 +270,7 @@ export function ManageableList({
                 </div>
                 <button
                   onClick={() => handleToggleActive(item)}
-                  className="text-xs text-ink-500 underline underline-offset-2"
+                  className="text-xs text-muted-foreground underline underline-offset-2"
                 >
                   {item.active === false ? (canWrite ? "Ativar" : "Solicitar ativação") : canWrite ? "Desativar" : "Solicitar desativação"}
                 </button>
@@ -290,7 +290,7 @@ export function ManageableList({
             )}
           </li>
         ))}
-        {items.length === 0 && <li className="px-4 py-6 text-center text-ink-500">Nenhum item cadastrado.</li>}
+        {items.length === 0 && <li className="px-4 py-6 text-center text-muted-foreground">Nenhum item cadastrado.</li>}
       </ul>
     </div>
   );

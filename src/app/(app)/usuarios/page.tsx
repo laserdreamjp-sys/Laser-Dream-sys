@@ -47,14 +47,14 @@ export default async function UsuariosPage() {
   const profiles = (profilesRes.data ?? []) as unknown as ProfileRow[];
   const invites = (invitesRes.data ?? []) as unknown as InviteRow[];  return (
     <div>
-      <h2 className="mb-6 font-serif text-2xl text-ink-900">Usuários</h2>
+      <h2 className="mb-6 font-display font-semibold text-2xl text-foreground">Usuários</h2>
 
       <NewInviteForm organizationId={organizationId} roles={rolesRes.data ?? []} units={unitsRes.data ?? []} />
 
-      <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">Equipe</h3>
-      <div className="mb-8 overflow-x-auto rounded-lg border border-gold-100 bg-white">
+      <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">Equipe</h3>
+      <div className="mb-8 overflow-x-auto rounded-lg border border-border bg-surface">
         <table className="w-full text-sm">
-          <thead className="bg-gold-50 text-left text-xs uppercase tracking-wide text-ink-500">
+          <thead className="bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-4 py-3">Nome</th>
               <th className="px-4 py-3">Papel</th>
@@ -75,12 +75,12 @@ export default async function UsuariosPage() {
         </table>
       </div>
 
-      <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">
+      <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">
         Convites pendentes
       </h3>
-      <div className="overflow-x-auto rounded-lg border border-gold-100 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-border bg-surface">
         <table className="w-full text-sm">
-          <thead className="bg-gold-50 text-left text-xs uppercase tracking-wide text-ink-500">
+          <thead className="bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-4 py-3">E-mail</th>
               <th className="px-4 py-3">Papel</th>
@@ -101,7 +101,7 @@ export default async function UsuariosPage() {
             ))}
             {invites.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-8 text-center text-ink-500">
+                <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
                   Nenhum convite gerado ainda.
                 </td>
               </tr>

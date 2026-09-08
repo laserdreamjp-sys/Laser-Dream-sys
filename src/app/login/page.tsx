@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -31,50 +32,56 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gold-50 px-4">
-      <div className="w-full max-w-sm rounded-lg border border-gold-200 bg-white p-8 shadow-sm">
-        <h1 className="mb-1 font-serif text-2xl text-ink-900">Laser Dream</h1>
-        <p className="mb-6 text-sm text-ink-500">Entrar no painel de gestão</p>
+    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-8 flex justify-center rounded-xl bg-[#1B140C] px-6 py-5">
+          <Image src="/icon.png" alt="" width={34} height={39} priority />
+          <Image src="/wordmark-dark.png" alt="Laser Dream" width={148} height={23} priority className="ml-2.5 self-center" />
+        </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm text-ink-700" htmlFor="email">
-              E-mail
-            </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
-            />
-          </div>
+        <div className="rounded-lg border border-border bg-surface p-8 shadow-soft">
+          <p className="mb-6 text-sm text-muted-foreground">Entrar no painel de gestão</p>
 
-          <div>
-            <label className="mb-1 block text-sm text-ink-700" htmlFor="password">
-              Senha
-            </label>
-            <input
-              id="password"
-              type="password"
-              required
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="mb-1 block text-sm text-foreground" htmlFor="email">
+                E-mail
+              </label>
+              <input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-gold-500"
+              />
+            </div>
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+            <div>
+              <label className="mb-1 block text-sm text-foreground" htmlFor="password">
+                Senha
+              </label>
+              <input
+                id="password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-gold-500"
+              />
+            </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-md bg-gold-500 py-2 text-sm font-medium text-white transition hover:bg-gold-600 disabled:opacity-60"
-          >
-            {loading ? "Entrando..." : "Entrar"}
-          </button>
-        </form>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full rounded-md bg-gold-500 py-2.5 text-sm font-medium text-white transition hover:bg-gold-600 disabled:opacity-60"
+            >
+              {loading ? "Entrando..." : "Entrar"}
+            </button>
+          </form>
+        </div>
       </div>
     </div>
   );

@@ -34,16 +34,16 @@ export default async function ConfiguracoesPage() {
   return (
     <div className="space-y-10">
       <div>
-        <h2 className="font-serif text-2xl text-ink-900">Configurações</h2>
+        <h2 className="font-display font-semibold text-2xl text-foreground">Configurações</h2>
         {!isAdmin && (
-          <p className="mt-1 text-sm text-ink-500">
+          <p className="mt-1 text-sm text-muted-foreground">
             Edições e exclusões aqui viram solicitação para o administrador aprovar.
           </p>
         )}
       </div>
 
       <section>
-        <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">Procedimentos</h3>
+        <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">Procedimentos</h3>
         <ManageableList
           table="procedures"
           organizationId={organizationId}
@@ -66,7 +66,7 @@ export default async function ConfiguracoesPage() {
       </section>
 
       <section>
-        <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">Vendedoras</h3>
+        <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">Vendedoras</h3>
         <ManageableList
           table="sellers"
           organizationId={organizationId}
@@ -81,7 +81,7 @@ export default async function ConfiguracoesPage() {
       </section>
 
       <section>
-        <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">
+        <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">
           Formas de pagamento
         </h3>
         <ManageableList
@@ -92,14 +92,14 @@ export default async function ConfiguracoesPage() {
           items={paymentMethodsRes.data ?? []}
           fields={[{ key: "name", label: "Nome", type: "text" }]}
         />
-        <p className="mt-1 text-xs text-ink-500">
+        <p className="mt-1 text-xs text-muted-foreground">
           O item com código de Dinheiro gera entrada automática no caixa; o de Boleto/Recorrente
           entra na classificação Recorrente. Renomear o texto é seguro, o comportamento não muda.
         </p>
       </section>
 
       <section>
-        <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">
+        <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">
           Origem do lead
         </h3>
         <ManageableList
@@ -113,7 +113,7 @@ export default async function ConfiguracoesPage() {
       </section>
 
       <section>
-        <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-ink-500">
+        <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">
           Categorias de caixa
         </h3>
         <ManageableList

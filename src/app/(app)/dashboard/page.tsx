@@ -83,13 +83,13 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <h2 className="font-serif text-2xl text-ink-900">Dashboard</h2>
+      <h2 className="font-display font-semibold text-2xl text-foreground">Dashboard</h2>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {cards.map((card) => (
-          <div key={card.label} className="rounded-lg border border-gold-100 bg-white p-5 shadow-sm">
-            <p className="mb-1 text-xs text-ink-500">{card.label}</p>
-            <p className="text-2xl font-medium text-gold-800">{card.value}</p>
+          <div key={card.label} className="rounded-lg border border-border bg-surface p-5 shadow-soft">
+            <p className="mb-1 text-xs text-muted-foreground">{card.label}</p>
+            <p className="font-display text-2xl font-semibold text-gold-600 dark:text-gold-400">{card.value}</p>
           </div>
         ))}
       </div>
@@ -102,27 +102,27 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <RecorrenteAlert pct={recorrentePct} />
 
-        <div className="rounded-lg border border-gold-100 bg-white p-4">
-          <p className="mb-2 text-sm font-medium text-ink-700">Revenda x Venda nova</p>
+        <div className="rounded-lg border border-border bg-surface p-4">
+          <p className="mb-2 text-sm font-medium text-foreground">Revenda x Venda nova</p>
           <div className="flex items-end gap-6">
             <div>
-              <p className="text-xs text-ink-500">Revenda</p>
+              <p className="text-xs text-muted-foreground">Revenda</p>
               <p className="text-xl font-medium text-gold-800">{formatCurrency(revendaTotal)}</p>
             </div>
             <div>
-              <p className="text-xs text-ink-500">Venda nova</p>
+              <p className="text-xs text-muted-foreground">Venda nova</p>
               <p className="text-xl font-medium text-gold-800">{formatCurrency(novaTotal)}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-gold-100 bg-white">
-        <p className="border-b border-gold-100 px-4 py-3 text-sm font-medium text-ink-700">
+      <div className="overflow-x-auto rounded-lg border border-border bg-surface">
+        <p className="border-b border-border px-4 py-3 text-sm font-medium text-foreground">
           Desempenho por vendedora
         </p>
         <table className="w-full text-sm">
-          <thead className="bg-gold-50 text-left text-xs uppercase tracking-wide text-ink-500">
+          <thead className="bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-4 py-2">Vendedora</th>
               <th className="px-4 py-2 text-right">Total vendido</th>
@@ -135,7 +135,7 @@ export default async function DashboardPage() {
             {sellerRanking.map((s) => {
               const farol = s.ticket >= 850 ? "Meta batida" : s.ticket >= 650 ? "Atenção" : "Abaixo do ideal";
               const color =
-                s.ticket >= 850 ? "bg-gold-100 text-gold-800" : s.ticket >= 650 ? "bg-gold-50 text-gold-700" : "bg-ink-100 text-ink-500";
+                s.ticket >= 850 ? "bg-gold-100 text-gold-800" : s.ticket >= 650 ? "bg-muted text-gold-700" : "bg-ink-100 text-muted-foreground";
               return (
                 <tr key={s.name} className="border-t border-gold-50">
                   <td className="px-4 py-2">{s.name}</td>
@@ -150,7 +150,7 @@ export default async function DashboardPage() {
             })}
             {sellerRanking.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-ink-500">
+                <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
                   Sem vendas no período.
                 </td>
               </tr>

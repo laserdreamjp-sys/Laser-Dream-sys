@@ -59,7 +59,7 @@ export function NewInviteForm({
   }
 
   return (
-    <div className="mb-6 rounded-lg border border-gold-100 bg-white p-4">
+    <div className="mb-6 rounded-lg border border-border bg-surface p-4">
       <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-4">
         <input
           required
@@ -67,13 +67,13 @@ export function NewInviteForm({
           placeholder="E-mail do convidado"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500 sm:col-span-2"
+          className="rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500 sm:col-span-2"
         />
 
         <select
           value={roleId}
           onChange={(e) => setRoleId(e.target.value)}
-          className="rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+          className="rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
         >
           {roles.map((r) => (
             <option key={r.id} value={r.id}>
@@ -85,7 +85,7 @@ export function NewInviteForm({
         <select
           value={unitId}
           onChange={(e) => setUnitId(e.target.value)}
-          className="rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+          className="rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
         >
           <option value="">Sem unidade fixa</option>
           {units.map((u) => (
@@ -107,8 +107,8 @@ export function NewInviteForm({
       </form>
 
       {link && (
-        <div className="mt-3 rounded-md bg-gold-50 p-3 text-sm">
-          <p className="mb-1 text-ink-700">Link do convite (compartilhe manualmente, válido por 14 dias):</p>
+        <div className="mt-3 rounded-md bg-muted p-3 text-sm">
+          <p className="mb-1 text-foreground">Link do convite (compartilhe manualmente, válido por 14 dias):</p>
           <p className="break-all font-mono text-xs text-gold-800">{link}</p>
         </div>
       )}

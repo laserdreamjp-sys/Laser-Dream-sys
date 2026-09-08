@@ -78,7 +78,7 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="font-serif text-2xl text-ink-900">Vendas</h2>
+        <h2 className="font-display font-semibold text-2xl text-foreground">Vendas</h2>
         <Link
           href="/vendas/novo"
           className="rounded-md bg-gold-500 px-4 py-2 text-sm font-medium text-white hover:bg-gold-600"
@@ -87,38 +87,38 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
         </Link>
       </div>
 
-      <form className="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-gold-100 bg-white p-4 sm:grid-cols-4 lg:grid-cols-7">
-        <input type="date" name="de" defaultValue={searchParams.de} className="rounded-md border border-gold-200 px-2 py-1 text-xs" />
-        <input type="date" name="ate" defaultValue={searchParams.ate} className="rounded-md border border-gold-200 px-2 py-1 text-xs" />
-        <select name="procedimento" defaultValue={searchParams.procedimento ?? ""} className="rounded-md border border-gold-200 px-2 py-1 text-xs">
+      <form className="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-border bg-surface p-4 sm:grid-cols-4 lg:grid-cols-7">
+        <input type="date" name="de" defaultValue={searchParams.de} className="rounded-md border border-border px-2 py-1 text-xs" />
+        <input type="date" name="ate" defaultValue={searchParams.ate} className="rounded-md border border-border px-2 py-1 text-xs" />
+        <select name="procedimento" defaultValue={searchParams.procedimento ?? ""} className="rounded-md border border-border px-2 py-1 text-xs">
           <option value="">Procedimento</option>
           {(proceduresRes.data ?? []).map((p) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
-        <select name="vendedor" defaultValue={searchParams.vendedor ?? ""} className="rounded-md border border-gold-200 px-2 py-1 text-xs">
+        <select name="vendedor" defaultValue={searchParams.vendedor ?? ""} className="rounded-md border border-border px-2 py-1 text-xs">
           <option value="">Vendedor(a)</option>
           {(sellersRes.data ?? []).map((s) => (
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
-        <select name="segmento" defaultValue={searchParams.segmento ?? ""} className="rounded-md border border-gold-200 px-2 py-1 text-xs">
+        <select name="segmento" defaultValue={searchParams.segmento ?? ""} className="rounded-md border border-border px-2 py-1 text-xs">
           <option value="">Segmento</option>
           <option value="laser">Laser</option>
           <option value="estetica">Estética</option>
         </select>
-        <select name="pagamento" defaultValue={searchParams.pagamento ?? ""} className="rounded-md border border-gold-200 px-2 py-1 text-xs">
+        <select name="pagamento" defaultValue={searchParams.pagamento ?? ""} className="rounded-md border border-border px-2 py-1 text-xs">
           <option value="">Pagamento</option>
           {paymentMethods.map((p) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
-        <select name="tipo" defaultValue={searchParams.tipo ?? ""} className="rounded-md border border-gold-200 px-2 py-1 text-xs">
+        <select name="tipo" defaultValue={searchParams.tipo ?? ""} className="rounded-md border border-border px-2 py-1 text-xs">
           <option value="">Tipo</option>
           <option value="REVENDA">Revenda</option>
           <option value="VENDA NOVA">Venda nova</option>
         </select>
-        <select name="status" defaultValue={searchParams.status ?? ""} className="rounded-md border border-gold-200 px-2 py-1 text-xs">
+        <select name="status" defaultValue={searchParams.status ?? ""} className="rounded-md border border-border px-2 py-1 text-xs">
           <option value="">Status</option>
           <option value="ativa">Ativa</option>
           <option value="cancelada">Cancelada</option>
@@ -127,15 +127,15 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
           <button type="submit" className="rounded-md bg-gold-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-gold-600">
             Filtrar
           </button>
-          <Link href="/vendas" className="rounded-md border border-gold-200 px-4 py-1.5 text-xs text-ink-700 hover:bg-gold-50">
+          <Link href="/vendas" className="rounded-md border border-border px-4 py-1.5 text-xs text-foreground hover:bg-muted">
             Limpar
           </Link>
         </div>
       </form>
 
-      <div className="overflow-x-auto rounded-lg border border-gold-100 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-border bg-surface">
         <table className="w-full text-sm">
-          <thead className="bg-gold-50 text-left text-xs uppercase tracking-wide text-ink-500">
+          <thead className="bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-4 py-3">Data</th>
               <th className="px-4 py-3">Cliente</th>
@@ -166,13 +166,13 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
                 <td className="px-4 py-3">
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs ${
-                      sale.status === "ativa" ? "bg-gold-100 text-gold-800" : "bg-ink-100 text-ink-500"
+                      sale.status === "ativa" ? "bg-gold-100 text-gold-800" : "bg-ink-100 text-muted-foreground"
                     }`}
                   >
                     {sale.status}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-xs text-ink-500 whitespace-nowrap">
+                <td className="px-4 py-3 text-xs text-muted-foreground whitespace-nowrap">
                   {sale.profiles?.full_name}
                   <br />
                   {formatDateTime(sale.created_at)}
@@ -196,7 +196,7 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
 
             {sales.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-4 py-8 text-center text-ink-500">
+                <td colSpan={11} className="px-4 py-8 text-center text-muted-foreground">
                   Nenhuma venda encontrada para esses filtros.
                 </td>
               </tr>

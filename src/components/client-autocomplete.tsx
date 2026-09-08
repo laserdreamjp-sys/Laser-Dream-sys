@@ -90,10 +90,10 @@ export function ClientAutocomplete({
         }}
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+        className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
       />
       {open && (matches.length > 0 || showCreateOption) && (
-        <ul className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-gold-200 bg-white shadow-md">
+        <ul className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-border bg-surface shadow-md">
           {matches.map((c) => (
             <li
               key={c.id}
@@ -102,7 +102,7 @@ export function ClientAutocomplete({
                 setQuery(c.name);
                 setOpen(false);
               }}
-              className="cursor-pointer px-3 py-2 text-sm hover:bg-gold-50"
+              className="cursor-pointer px-3 py-2 text-sm hover:bg-muted"
             >
               {c.name}
             </li>
@@ -110,7 +110,7 @@ export function ClientAutocomplete({
           {showCreateOption && (
             <li
               onMouseDown={openCreateModal}
-              className="cursor-pointer px-3 py-2 text-sm font-medium text-gold-700 hover:bg-gold-50"
+              className="cursor-pointer px-3 py-2 text-sm font-medium text-gold-700 hover:bg-muted"
             >
               {`+ Cadastrar "${query.trim()}" como novo cliente`}
             </li>
@@ -120,33 +120,33 @@ export function ClientAutocomplete({
 
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 px-4">
-          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
-            <h3 className="mb-4 font-serif text-lg text-ink-900">Novo cliente</h3>
+          <div className="w-full max-w-sm rounded-lg bg-surface p-6 shadow-lg">
+            <h3 className="mb-4 font-display font-semibold text-lg text-foreground">Novo cliente</h3>
             <form onSubmit={handleConfirmCreate} className="space-y-3">
               <div>
-                <label className="mb-1 block text-sm text-ink-700">Nome</label>
+                <label className="mb-1 block text-sm text-foreground">Nome</label>
                 <input
                   required
                   value={newName}
                   onChange={(e) => setNewName(e.target.value)}
-                  className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+                  className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm text-ink-700">Telefone (opcional)</label>
+                <label className="mb-1 block text-sm text-foreground">Telefone (opcional)</label>
                 <input
                   value={newPhone}
                   onChange={(e) => setNewPhone(e.target.value)}
-                  className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+                  className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm text-ink-700">E-mail (opcional)</label>
+                <label className="mb-1 block text-sm text-foreground">E-mail (opcional)</label>
                 <input
                   type="email"
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
-                  className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+                  className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
                 />
               </div>
 
@@ -156,7 +156,7 @@ export function ClientAutocomplete({
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="rounded-md border border-gold-200 px-4 py-2 text-sm text-ink-700 hover:bg-gold-50"
+                  className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
                 >
                   Cancelar
                 </button>

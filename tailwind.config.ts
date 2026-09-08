@@ -12,6 +12,14 @@ const config: Config = {
         border: "hsl(var(--border))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        surface: {
+          DEFAULT: "hsl(var(--surface))",
+          foreground: "hsl(var(--foreground))",
+        },
+        muted: {
+          DEFAULT: "hsl(var(--muted))",
+          foreground: "hsl(var(--muted-foreground))",
+        },
         gold: {
           50: "#FBF6EA",
           100: "#F5E7C4",
@@ -34,11 +42,7 @@ const config: Config = {
         },
         primary: {
           DEFAULT: "#C4922B",
-          foreground: "#332408",
-        },
-        muted: {
-          DEFAULT: "#F7F6F3",
-          foreground: "#7A7568",
+          foreground: "#FBF6EA",
         },
         destructive: {
           DEFAULT: "#B3432E",
@@ -46,13 +50,16 @@ const config: Config = {
         },
       },
       borderRadius: {
-        lg: "0.75rem",
-        md: "0.5rem",
-        sm: "0.375rem",
+        lg: "0.85rem",
+        md: "0.6rem",
+        sm: "0.4rem",
       },
       fontFamily: {
-        sans: ["var(--font-sans)"],
-        serif: ["var(--font-serif)"],
+        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        display: ["Quicksand", "ui-sans-serif", "sans-serif"],
+      },
+      boxShadow: {
+        soft: "0 1px 2px 0 rgb(0 0 0 / 0.04), 0 4px 16px -4px rgb(0 0 0 / 0.06)",
       },
     },
   },

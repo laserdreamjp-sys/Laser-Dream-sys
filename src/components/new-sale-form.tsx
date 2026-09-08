@@ -152,7 +152,7 @@ export function NewSaleForm({
               required
               value={saleDate}
               onChange={(e) => setSaleDate(e.target.value)}
-              className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+              className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
             />
           </Field>
 
@@ -164,7 +164,7 @@ export function NewSaleForm({
                 setUnitId(e.target.value);
                 setSellerId("");
               }}
-              className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+              className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
             >
               {units.map((u) => (
                 <option key={u.id} value={u.id}>
@@ -190,7 +190,7 @@ export function NewSaleForm({
               required
               value={sellerId}
               onChange={(e) => setSellerId(e.target.value)}
-              className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+              className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
             >
               <option value="" disabled>
                 Selecione
@@ -202,7 +202,7 @@ export function NewSaleForm({
               ))}
             </select>
             {sellersForUnit.length === 0 && (
-              <p className="mt-1 text-xs text-ink-500">
+              <p className="mt-1 text-xs text-muted-foreground">
                 Nenhuma vendedora cadastrada nesta unidade ainda. Cadastre em Configurações.
               </p>
             )}
@@ -212,7 +212,7 @@ export function NewSaleForm({
             <select
               value={leadOriginId}
               onChange={(e) => setLeadOriginId(e.target.value)}
-              className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+              className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
             >
               {leadOrigins.map((o) => (
                 <option key={o.id} value={o.id}>
@@ -235,7 +235,7 @@ export function NewSaleForm({
                 className={`rounded-md px-4 py-2 text-sm font-medium transition ${
                   segment === seg
                     ? "bg-gold-500 text-white"
-                    : "border border-gold-200 text-ink-700 hover:bg-gold-50"
+                    : "border border-border text-foreground hover:bg-muted"
                 }`}
               >
                 {seg === "laser" ? "Depilação a Laser" : "Estética"}
@@ -252,7 +252,7 @@ export function NewSaleForm({
               setProcedureId(e.target.value);
               setSelectedAreaIds([]);
             }}
-            className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+            className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
           >
             <option value="" disabled>
               Selecione
@@ -267,11 +267,11 @@ export function NewSaleForm({
 
         {segment === "laser" ? (
           <div>
-            <p className="mb-2 text-sm text-ink-700">Área / região de aplicação</p>
-            <div className="space-y-3 rounded-md border border-gold-100 bg-white p-4">
+            <p className="mb-2 text-sm text-foreground">Área / região de aplicação</p>
+            <div className="space-y-3 rounded-md border border-border bg-surface p-4">
               {groupedAreas.map(([group, groupAreas]) => (
                 <div key={group}>
-                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-ink-500">
+                  <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     {group}
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -281,7 +281,7 @@ export function NewSaleForm({
                         className={`cursor-pointer rounded-full border px-3 py-1 text-xs ${
                           selectedAreaIds.includes(a.id)
                             ? "border-gold-500 bg-gold-100 text-gold-800"
-                            : "border-gold-200 text-ink-700"
+                            : "border-border text-foreground"
                         }`}
                       >
                         <input
@@ -304,7 +304,7 @@ export function NewSaleForm({
               <select
                 value={selectedAreaIds[0] ?? ""}
                 onChange={(e) => setSelectedAreaIds(e.target.value ? [e.target.value] : [])}
-                className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+                className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
               >
                 <option value="">Nenhuma</option>
                 {groupedAreas.map(([group, groupAreas]) => (
@@ -331,7 +331,7 @@ export function NewSaleForm({
               placeholder="0,00"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+              className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
             />
           </Field>
 
@@ -339,7 +339,7 @@ export function NewSaleForm({
             <select
               value={paymentMethodId}
               onChange={(e) => setPaymentMethodId(e.target.value)}
-              className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+              className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
             >
               {paymentMethods.map((m) => (
                 <option key={m.id} value={m.id}>
@@ -355,7 +355,7 @@ export function NewSaleForm({
             <select
               value={installments}
               onChange={(e) => setInstallments(Number(e.target.value))}
-              className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+              className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
             >
               {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
                 <option key={n} value={n}>
@@ -370,7 +370,7 @@ export function NewSaleForm({
           <input
             value={transactionCode}
             onChange={(e) => setTransactionCode(e.target.value)}
-            className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+            className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
           />
         </Field>
 
@@ -379,7 +379,7 @@ export function NewSaleForm({
             rows={2}
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="w-full rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+            className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
           />
         </Field>
       </Section>
@@ -399,8 +399,8 @@ export function NewSaleForm({
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-4 rounded-lg border border-gold-100 bg-white p-6">
-      <h3 className="text-sm font-medium uppercase tracking-wide text-ink-500">{title}</h3>
+    <section className="space-y-4 rounded-lg border border-border bg-surface p-6">
+      <h3 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">{title}</h3>
       {children}
     </section>
   );
@@ -408,7 +408,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block text-sm text-ink-700">
+    <label className="block text-sm text-foreground">
       <span className="mb-1 block">{label}</span>
       {children}
     </label>

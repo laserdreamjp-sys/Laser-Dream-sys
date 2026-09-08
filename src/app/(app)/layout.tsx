@@ -25,7 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const roleName = profile?.roles?.name ?? "";
 
   return (
-    <div className="min-h-screen bg-gold-50 md:flex">
+    <div className="min-h-screen bg-background md:flex">
       <Sidebar fullName={fullName} roleName={roleName} />
       <main className="flex-1 overflow-y-auto p-4 md:p-8">{children}</main>
     </div>

@@ -56,9 +56,9 @@ export default async function CaixaPage() {
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="font-serif text-2xl text-ink-900">Caixa</h2>
-        <div className="rounded-lg border border-gold-100 bg-white px-4 py-2 text-right">
-          <p className="text-xs text-ink-500">Saldo atual</p>
+        <h2 className="font-display font-semibold text-2xl text-foreground">Caixa</h2>
+        <div className="rounded-lg border border-border bg-surface px-4 py-2 text-right">
+          <p className="text-xs text-muted-foreground">Saldo atual</p>
           <p className="text-xl font-medium text-gold-800">{formatCurrency(saldo)}</p>
         </div>
       </div>
@@ -70,9 +70,9 @@ export default async function CaixaPage() {
         categories={categoriesRes.data ?? []}
       />
 
-      <div className="overflow-x-auto rounded-lg border border-gold-100 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-border bg-surface">
         <table className="w-full text-sm">
-          <thead className="bg-gold-50 text-left text-xs uppercase tracking-wide text-ink-500">
+          <thead className="bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-4 py-3">Data</th>
               <th className="px-4 py-3">Unidade</th>
@@ -90,7 +90,7 @@ export default async function CaixaPage() {
                 <td className="px-4 py-3">
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs ${
-                      t.type === "entrada" ? "bg-gold-100 text-gold-800" : "bg-ink-100 text-ink-500"
+                      t.type === "entrada" ? "bg-gold-100 text-gold-800" : "bg-ink-100 text-muted-foreground"
                     }`}
                   >
                     {t.type}
@@ -104,7 +104,7 @@ export default async function CaixaPage() {
             ))}
             {transactions.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-ink-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
                   Nenhuma movimentação registrada ainda.
                 </td>
               </tr>

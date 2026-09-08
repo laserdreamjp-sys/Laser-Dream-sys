@@ -58,11 +58,11 @@ export function NewCashOutForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-gold-100 bg-white p-4 sm:grid-cols-6">
+    <form onSubmit={handleSubmit} className="mb-6 grid grid-cols-1 gap-3 rounded-lg border border-border bg-surface p-4 sm:grid-cols-6">
       <select
         value={unitId}
         onChange={(e) => setUnitId(e.target.value)}
-        className="rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+        className="rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
       >
         {units.map((u) => (
           <option key={u.id} value={u.id}>
@@ -76,7 +76,7 @@ export function NewCashOutForm({
         required
         value={transactionDate}
         onChange={(e) => setTransactionDate(e.target.value)}
-        className="rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+        className="rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
       />
 
       <input
@@ -84,13 +84,13 @@ export function NewCashOutForm({
         placeholder="Descrição"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        className="rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500 sm:col-span-2"
+        className="rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500 sm:col-span-2"
       />
 
       <select
         value={categoryId}
         onChange={(e) => setCategoryId(e.target.value)}
-        className="rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+        className="rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
       >
         <option value="">Categoria</option>
         {categories.map((c) => (
@@ -106,7 +106,7 @@ export function NewCashOutForm({
         placeholder="Valor (R$)"
         value={amount}
         onChange={(e) => setAmount(e.target.value)}
-        className="rounded-md border border-gold-200 px-3 py-2 text-sm outline-none focus:border-gold-500"
+        className="rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
       />
 
       {error && <p className="text-sm text-destructive sm:col-span-6">{error}</p>}

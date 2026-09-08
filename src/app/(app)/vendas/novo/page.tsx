@@ -47,7 +47,7 @@ export default async function NovaVendaPage() {
 
   return (
     <div>
-      <h2 className="mb-6 font-serif text-2xl text-ink-900">Nova venda</h2>
+      <h2 className="mb-6 font-display font-semibold text-2xl text-foreground">Nova venda</h2>
       <NewSaleForm
         organizationId={profile!.organization_id}
         userId={user!.id}

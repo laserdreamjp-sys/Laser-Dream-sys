@@ -23,13 +23,13 @@ export default async function ClientesPage() {
 
   return (
     <div>
-      <h2 className="mb-6 font-serif text-2xl text-ink-900">Clientes</h2>
+      <h2 className="mb-6 font-display font-semibold text-2xl text-foreground">Clientes</h2>
 
       <NewClientForm organizationId={profile!.organization_id} />
 
-      <div className="overflow-x-auto rounded-lg border border-gold-100 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-border bg-surface">
         <table className="w-full text-sm">
-          <thead className="bg-gold-50 text-left text-xs uppercase tracking-wide text-ink-500">
+          <thead className="bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-4 py-3">Nome</th>
               <th className="px-4 py-3">Telefone</th>
@@ -46,7 +46,7 @@ export default async function ClientesPage() {
             ))}
             {(clients ?? []).length === 0 && (
               <tr>
-                <td colSpan={3} className="px-4 py-8 text-center text-ink-500">
+                <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
                   Nenhum cliente cadastrado ainda.
                 </td>
               </tr>

@@ -106,12 +106,12 @@ export function SaleRowActions({
         <input
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          className="w-20 rounded border border-gold-200 px-1 py-0.5 text-xs"
+          className="w-20 rounded border border-border px-1 py-0.5 text-xs"
         />
         <select
           value={paymentMethodId}
           onChange={(e) => setPaymentMethodId(e.target.value)}
-          className="rounded border border-gold-200 px-1 py-0.5 text-xs"
+          className="rounded border border-border px-1 py-0.5 text-xs"
         >
           {paymentMethods.map((p) => (
             <option key={p.id} value={p.id}>
@@ -126,7 +126,7 @@ export function SaleRowActions({
         >
           {isAdmin ? "Salvar" : "Enviar"}
         </button>
-        <button onClick={() => setEditing(false)} className="text-xs text-ink-500 underline">
+        <button onClick={() => setEditing(false)} className="text-xs text-muted-foreground underline">
           Cancelar
         </button>
       </div>
