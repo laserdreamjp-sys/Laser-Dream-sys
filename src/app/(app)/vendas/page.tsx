@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
 import { SaleRowActions } from "@/components/sale-row-actions";
+import { MonthSwitcher } from "@/components/month-switcher";
 
 function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -15,9 +16,21 @@ function formatDateTime(value: string) {
   return new Date(value).toLocaleString("pt-BR");
 }
 
+function currentMonthStr() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthBounds(monthStr: string) {
+  const [y, m] = monthStr.split("-").map(Number);
+  const de = `${monthStr}-01`;
+  const lastDay = new Date(y, m, 0).getDate();
+  const ate = `${monthStr}-${String(lastDay).padStart(2, "0")}`;
+  return { de, ate };
+}
+
 type SearchParams = {
-  de?: string;
-  ate?: string;
+  mes?: string;
   procedimento?: string;
   vendedor?: string;
   segmento?: string;
@@ -30,6 +43,9 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
   const supabase = createClient();
   const { organizationId, userId, isAdmin } = await getCurrentProfile();
 
+  const selectedMonth = searchParams.mes ?? currentMonthStr();
+  const { de, ate } = monthBounds(selectedMonth);
+
   const proceduresRes = await supabase.from("procedures").select("id, name").order("name");
   const sellersRes = await supabase.from("sellers").select("id, name").order("name");
   const paymentMethodsRes = await supabase.from("payment_methods").select("id, name").order("name");
@@ -39,11 +55,11 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
     .select(
       "id, sale_date, amount, status, tipo_venda, payment_method_id, notes, created_at, clients(name), sellers(name), procedures(id, name, segment), payment_methods(name), profiles!sales_created_by_fkey(full_name)"
     )
+    .gte("sale_date", de)
+    .lte("sale_date", ate)
     .order("sale_date", { ascending: false })
-    .limit(200);
+    .limit(500);
 
-  if (searchParams.de) query = query.gte("sale_date", searchParams.de);
-  if (searchParams.ate) query = query.lte("sale_date", searchParams.ate);
   if (searchParams.procedimento) query = query.eq("procedure_id", searchParams.procedimento);
   if (searchParams.vendedor) query = query.eq("seller_id", searchParams.vendedor);
   if (searchParams.pagamento) query = query.eq("payment_method_id", searchParams.pagamento);
@@ -92,17 +108,22 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
 
   const paymentMethods = paymentMethodsRes.data ?? [];
 
-  const exportParams = new URLSearchParams(
-    Object.entries(searchParams).filter(([, v]) => v) as [string, string][]
-  ).toString();
+  const otherParams = Object.fromEntries(
+    Object.entries(searchParams).filter(([k, v]) => v && k !== "mes")
+  ) as Record<string, string>;
+
+  const exportParams = new URLSearchParams({ ...otherParams, de, ate }).toString();
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-display font-semibold text-2xl text-foreground">Vendas</h2>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <h2 className="font-display font-semibold text-2xl text-foreground">Vendas</h2>
+          <MonthSwitcher currentMonth={selectedMonth} basePath="/vendas" otherParams={otherParams} />
+        </div>
         <div className="flex gap-2">
           <a
-            href={`/api/relatorios/vendas${exportParams ? `?${exportParams}` : ""}`}
+            href={`/api/relatorios/vendas?${exportParams}`}
             className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
           >
             Baixar CSV
@@ -116,9 +137,8 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
         </div>
       </div>
 
-      <form className="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-border bg-surface p-4 sm:grid-cols-4 lg:grid-cols-7">
-        <input type="date" name="de" defaultValue={searchParams.de} className="rounded-md border border-border bg-background px-2 py-1 text-xs" />
-        <input type="date" name="ate" defaultValue={searchParams.ate} className="rounded-md border border-border bg-background px-2 py-1 text-xs" />
+      <form className="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-border bg-surface p-4 sm:grid-cols-3 lg:grid-cols-6">
+        <input type="hidden" name="mes" value={selectedMonth} />
         <select name="procedimento" defaultValue={searchParams.procedimento ?? ""} className="rounded-md border border-border bg-background px-2 py-1 text-xs">
           <option value="">Procedimento</option>
           {(proceduresRes.data ?? []).map((p) => (
@@ -152,12 +172,12 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
           <option value="ativa">Ativa</option>
           <option value="cancelada">Cancelada</option>
         </select>
-        <div className="col-span-2 flex gap-2 sm:col-span-4 lg:col-span-7">
+        <div className="col-span-2 flex gap-2 sm:col-span-3 lg:col-span-6">
           <button type="submit" className="rounded-md bg-gold-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-gold-600">
             Filtrar
           </button>
-          <Link href="/vendas" className="rounded-md border border-border px-4 py-1.5 text-xs text-foreground hover:bg-muted">
-            Limpar
+          <Link href={`/vendas?mes=${selectedMonth}`} className="rounded-md border border-border px-4 py-1.5 text-xs text-foreground hover:bg-muted">
+            Limpar filtros
           </Link>
         </div>
       </form>
@@ -230,7 +250,7 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
             {sales.length === 0 && (
               <tr>
                 <td colSpan={12} className="px-4 py-8 text-center text-muted-foreground">
-                  Nenhuma venda encontrada para esses filtros.
+                  Nenhuma venda encontrada em {selectedMonth} para esses filtros.
                 </td>
               </tr>
             )}
