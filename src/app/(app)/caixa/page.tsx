@@ -83,7 +83,7 @@ export default async function CaixaPage() {
           </thead>
           <tbody>
             {transactions.map((t) => (
-              <tr key={t.id} className="border-t border-gold-50">
+              <tr key={t.id} className="border-t border-border">
                 <td className="px-4 py-3">{formatDate(t.transaction_date)}</td>
                 <td className="px-4 py-3">{t.units?.name}</td>
                 <td className="px-4 py-3">{t.description}</td>

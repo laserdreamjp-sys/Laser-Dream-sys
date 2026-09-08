@@ -18,8 +18,14 @@ export default async function ClientesPage() {
 
   const { data: clients } = await supabase
     .from("clients")
-    .select("id, name, phone, email, created_at")
+    .select("id, name, phone, email, birth_date, created_at")
     .order("name");
+
+  function formatBirthDate(value: string | null) {
+    if (!value) return "-";
+    const [, month, day] = value.split("-");
+    return `${day}/${month}`;
+  }
 
   return (
     <div>
@@ -34,19 +40,21 @@ export default async function ClientesPage() {
               <th className="px-4 py-3">Nome</th>
               <th className="px-4 py-3">Telefone</th>
               <th className="px-4 py-3">E-mail</th>
+              <th className="px-4 py-3">Aniversário</th>
             </tr>
           </thead>
           <tbody>
             {(clients ?? []).map((client) => (
-              <tr key={client.id} className="border-t border-gold-50">
+              <tr key={client.id} className="border-t border-border">
                 <td className="px-4 py-3">{client.name}</td>
                 <td className="px-4 py-3">{client.phone ?? "-"}</td>
                 <td className="px-4 py-3">{client.email ?? "-"}</td>
+                <td className="px-4 py-3">{formatBirthDate(client.birth_date)}</td>
               </tr>
             ))}
             {(clients ?? []).length === 0 && (
               <tr>
-                <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
                   Nenhum cliente cadastrado ainda.
                 </td>
               </tr>

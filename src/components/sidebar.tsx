@@ -15,6 +15,7 @@ import {
   UserCog,
   Settings,
   LogOut,
+  FileBarChart,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -24,6 +25,7 @@ const NAV_ITEMS = [
   { href: "/vendas", label: "Vendas", icon: ShoppingBag },
   { href: "/caixa", label: "Caixa", icon: Wallet },
   { href: "/clientes", label: "Clientes", icon: Users },
+  { href: "/relatorios", label: "Relatórios", icon: FileBarChart },
   { href: "/solicitacoes", label: "Solicitações", icon: Bell },
   { href: "/usuarios", label: "Usuários", icon: UserCog },
   { href: "/configuracoes", label: "Configurações", icon: Settings },

@@ -64,7 +64,7 @@ export default async function UsuariosPage() {
           </thead>
           <tbody>
             {profiles.map((p) => (
-              <tr key={p.id} className="border-t border-gold-50">
+              <tr key={p.id} className="border-t border-border">
                 <td className="px-4 py-3">{p.full_name}</td>
                 <td className="px-4 py-3">{p.roles?.name}</td>
                 <td className="px-4 py-3">{p.units?.name ?? "-"}</td>
@@ -90,7 +90,7 @@ export default async function UsuariosPage() {
           </thead>
           <tbody>
             {invites.map((i) => (
-              <tr key={i.id} className="border-t border-gold-50">
+              <tr key={i.id} className="border-t border-border">
                 <td className="px-4 py-3">{i.email}</td>
                 <td className="px-4 py-3">{i.roles?.name}</td>
                 <td className="px-4 py-3">{i.status}</td>

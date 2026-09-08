@@ -81,6 +81,20 @@ export default async function DashboardPage() {
     .map(([name, { total, count }]) => ({ name, total, count, ticket: count > 0 ? total / count : 0 }))
     .sort((a, b) => b.total - a.total);
 
+  const clientsWithBirthdayRes = await supabase
+    .from("clients")
+    .select("name, phone, birth_date")
+    .not("birth_date", "is", null);
+
+  const currentMonth = new Date().getMonth();
+  const birthdays = (clientsWithBirthdayRes.data ?? [])
+    .filter((c) => c.birth_date && new Date(c.birth_date + "T00:00:00").getMonth() === currentMonth)
+    .sort(
+      (a, b) =>
+        Number(new Date(a.birth_date + "T00:00:00").getDate()) -
+        Number(new Date(b.birth_date + "T00:00:00").getDate())
+    );
+
   return (
     <div className="space-y-6">
       <h2 className="font-display font-semibold text-2xl text-foreground">Dashboard</h2>
@@ -117,6 +131,22 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      <div className="rounded-lg border border-border bg-surface p-4">
+        <p className="mb-2 text-sm font-medium text-foreground">Aniversariantes do mês</p>
+        {birthdays.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nenhum cliente com aniversário cadastrado este mês.</p>
+        ) : (
+          <ul className="flex flex-wrap gap-2">
+            {birthdays.map((c, i) => (
+              <li key={i} className="rounded-full bg-gold-100 px-3 py-1 text-xs text-gold-800">
+                {String(new Date(c.birth_date + "T00:00:00").getDate()).padStart(2, "0")} · {c.name}
+                {c.phone ? ` · ${c.phone}` : ""}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
         <p className="border-b border-border px-4 py-3 text-sm font-medium text-foreground">
           Desempenho por vendedora
@@ -137,7 +167,7 @@ export default async function DashboardPage() {
               const color =
                 s.ticket >= 850 ? "bg-gold-100 text-gold-800" : s.ticket >= 650 ? "bg-muted text-gold-700" : "bg-ink-100 text-muted-foreground";
               return (
-                <tr key={s.name} className="border-t border-gold-50">
+                <tr key={s.name} className="border-t border-border">
                   <td className="px-4 py-2">{s.name}</td>
                   <td className="px-4 py-2 text-right">{formatCurrency(s.total)}</td>
                   <td className="px-4 py-2 text-right">{s.count}</td>

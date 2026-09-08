@@ -27,6 +27,7 @@ export function ClientAutocomplete({
   const [newName, setNewName] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newEmail, setNewEmail] = useState("");
+  const [newBirthDate, setNewBirthDate] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
@@ -42,6 +43,7 @@ export function ClientAutocomplete({
     setNewName(query.trim());
     setNewPhone("");
     setNewEmail("");
+    setNewBirthDate("");
     setCreateError(null);
     setShowModal(true);
     setOpen(false);
@@ -59,6 +61,7 @@ export function ClientAutocomplete({
         name: newName.trim(),
         phone: newPhone || null,
         email: newEmail || null,
+        birth_date: newBirthDate || null,
       })
       .select("id, name")
       .single();
@@ -146,6 +149,15 @@ export function ClientAutocomplete({
                   type="email"
                   value={newEmail}
                   onChange={(e) => setNewEmail(e.target.value)}
+                  className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm text-foreground">Aniversário (opcional)</label>
+                <input
+                  type="date"
+                  value={newBirthDate}
+                  onChange={(e) => setNewBirthDate(e.target.value)}
                   className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
                 />
               </div>

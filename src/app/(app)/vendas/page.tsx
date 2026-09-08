@@ -73,52 +73,81 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
     sales = sales.filter((s) => s.procedures?.segment === searchParams.segmento);
   }
 
+  const saleIds = sales.map((s) => s.id);
+  const areasBySale = new Map<string, string[]>();
+  if (saleIds.length > 0) {
+    const { data: saleAreasRaw } = await supabase
+      .from("sale_areas")
+      .select("sale_id, procedure_areas(name)")
+      .in("sale_id", saleIds);
+
+    type SaleAreaRow = { sale_id: string; procedure_areas: { name: string } | null };
+    for (const row of (saleAreasRaw ?? []) as unknown as SaleAreaRow[]) {
+      if (!row.procedure_areas) continue;
+      const list = areasBySale.get(row.sale_id) ?? [];
+      list.push(row.procedure_areas.name);
+      areasBySale.set(row.sale_id, list);
+    }
+  }
+
   const paymentMethods = paymentMethodsRes.data ?? [];
+
+  const exportParams = new URLSearchParams(
+    Object.entries(searchParams).filter(([, v]) => v) as [string, string][]
+  ).toString();
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-display font-semibold text-2xl text-foreground">Vendas</h2>
-        <Link
-          href="/vendas/novo"
-          className="rounded-md bg-gold-500 px-4 py-2 text-sm font-medium text-white hover:bg-gold-600"
-        >
-          Nova venda
-        </Link>
+        <div className="flex gap-2">
+          <a
+            href={`/api/relatorios/vendas${exportParams ? `?${exportParams}` : ""}`}
+            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+          >
+            Baixar CSV
+          </a>
+          <Link
+            href="/vendas/novo"
+            className="rounded-md bg-gold-500 px-4 py-2 text-sm font-medium text-white hover:bg-gold-600"
+          >
+            Nova venda
+          </Link>
+        </div>
       </div>
 
       <form className="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-border bg-surface p-4 sm:grid-cols-4 lg:grid-cols-7">
-        <input type="date" name="de" defaultValue={searchParams.de} className="rounded-md border border-border px-2 py-1 text-xs" />
-        <input type="date" name="ate" defaultValue={searchParams.ate} className="rounded-md border border-border px-2 py-1 text-xs" />
-        <select name="procedimento" defaultValue={searchParams.procedimento ?? ""} className="rounded-md border border-border px-2 py-1 text-xs">
+        <input type="date" name="de" defaultValue={searchParams.de} className="rounded-md border border-border bg-background px-2 py-1 text-xs" />
+        <input type="date" name="ate" defaultValue={searchParams.ate} className="rounded-md border border-border bg-background px-2 py-1 text-xs" />
+        <select name="procedimento" defaultValue={searchParams.procedimento ?? ""} className="rounded-md border border-border bg-background px-2 py-1 text-xs">
           <option value="">Procedimento</option>
           {(proceduresRes.data ?? []).map((p) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
-        <select name="vendedor" defaultValue={searchParams.vendedor ?? ""} className="rounded-md border border-border px-2 py-1 text-xs">
+        <select name="vendedor" defaultValue={searchParams.vendedor ?? ""} className="rounded-md border border-border bg-background px-2 py-1 text-xs">
           <option value="">Vendedor(a)</option>
           {(sellersRes.data ?? []).map((s) => (
             <option key={s.id} value={s.id}>{s.name}</option>
           ))}
         </select>
-        <select name="segmento" defaultValue={searchParams.segmento ?? ""} className="rounded-md border border-border px-2 py-1 text-xs">
+        <select name="segmento" defaultValue={searchParams.segmento ?? ""} className="rounded-md border border-border bg-background px-2 py-1 text-xs">
           <option value="">Segmento</option>
           <option value="laser">Laser</option>
           <option value="estetica">Estética</option>
         </select>
-        <select name="pagamento" defaultValue={searchParams.pagamento ?? ""} className="rounded-md border border-border px-2 py-1 text-xs">
+        <select name="pagamento" defaultValue={searchParams.pagamento ?? ""} className="rounded-md border border-border bg-background px-2 py-1 text-xs">
           <option value="">Pagamento</option>
           {paymentMethods.map((p) => (
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
-        <select name="tipo" defaultValue={searchParams.tipo ?? ""} className="rounded-md border border-border px-2 py-1 text-xs">
+        <select name="tipo" defaultValue={searchParams.tipo ?? ""} className="rounded-md border border-border bg-background px-2 py-1 text-xs">
           <option value="">Tipo</option>
           <option value="REVENDA">Revenda</option>
           <option value="VENDA NOVA">Venda nova</option>
         </select>
-        <select name="status" defaultValue={searchParams.status ?? ""} className="rounded-md border border-border px-2 py-1 text-xs">
+        <select name="status" defaultValue={searchParams.status ?? ""} className="rounded-md border border-border bg-background px-2 py-1 text-xs">
           <option value="">Status</option>
           <option value="ativa">Ativa</option>
           <option value="cancelada">Cancelada</option>
@@ -142,6 +171,7 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
               <th className="px-4 py-3">Vendedor(a)</th>
               <th className="px-4 py-3">Segmento</th>
               <th className="px-4 py-3">Procedimento</th>
+              <th className="px-4 py-3">Áreas</th>
               <th className="px-4 py-3">Pagamento</th>
               <th className="px-4 py-3">Tipo</th>
               <th className="px-4 py-3 text-right">Valor</th>
@@ -152,7 +182,7 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
           </thead>
           <tbody>
             {sales.map((sale) => (
-              <tr key={sale.id} className="border-t border-gold-50 align-top">
+              <tr key={sale.id} className="border-t border-border align-top">
                 <td className="px-4 py-3 whitespace-nowrap">{formatDate(sale.sale_date)}</td>
                 <td className="px-4 py-3">{sale.clients?.name}</td>
                 <td className="px-4 py-3">{sale.sellers?.name}</td>
@@ -160,13 +190,16 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
                   {sale.procedures?.segment === "laser" ? "Laser" : sale.procedures?.segment === "estetica" ? "Estética" : "-"}
                 </td>
                 <td className="px-4 py-3">{sale.procedures?.name ?? "-"}</td>
+                <td className="px-4 py-3 max-w-[200px]">
+                  {(areasBySale.get(sale.id) ?? []).join(", ") || "-"}
+                </td>
                 <td className="px-4 py-3">{sale.payment_methods?.name ?? "-"}</td>
                 <td className="px-4 py-3">{sale.tipo_venda ?? "-"}</td>
                 <td className="px-4 py-3 text-right whitespace-nowrap">{formatCurrency(Number(sale.amount))}</td>
                 <td className="px-4 py-3">
                   <span
                     className={`rounded-full px-2 py-0.5 text-xs ${
-                      sale.status === "ativa" ? "bg-gold-100 text-gold-800" : "bg-ink-100 text-muted-foreground"
+                      sale.status === "ativa" ? "bg-gold-100 text-gold-800" : "bg-muted text-muted-foreground"
                     }`}
                   >
                     {sale.status}
@@ -196,7 +229,7 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
 
             {sales.length === 0 && (
               <tr>
-                <td colSpan={11} className="px-4 py-8 text-center text-muted-foreground">
+                <td colSpan={12} className="px-4 py-8 text-center text-muted-foreground">
                   Nenhuma venda encontrada para esses filtros.
                 </td>
               </tr>
