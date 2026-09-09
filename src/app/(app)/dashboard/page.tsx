@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { SegmentChart, PaymentMethodChart, RecorrenteAlert } from "@/components/dashboard-charts";
 
@@ -81,19 +82,12 @@ export default async function DashboardPage() {
     .map(([name, { total, count }]) => ({ name, total, count, ticket: count > 0 ? total / count : 0 }))
     .sort((a, b) => b.total - a.total);
 
-  const clientsWithBirthdayRes = await supabase
-    .from("clients")
-    .select("name, phone, birth_date")
-    .not("birth_date", "is", null);
-
-  const currentMonth = new Date().getMonth();
-  const birthdays = (clientsWithBirthdayRes.data ?? [])
-    .filter((c) => c.birth_date && new Date(c.birth_date + "T00:00:00").getMonth() === currentMonth)
-    .sort(
-      (a, b) =>
-        Number(new Date(a.birth_date + "T00:00:00").getDate()) -
-        Number(new Date(b.birth_date + "T00:00:00").getDate())
-    );
+  const radarRes = await supabase.from("client_intelligence").select("bucket");
+  const radarCounts: Record<string, number> = {};
+  for (const row of radarRes.data ?? []) {
+    const key = (row as { bucket: string }).bucket;
+    radarCounts[key] = (radarCounts[key] ?? 0) + 1;
+  }
 
   return (
     <div className="space-y-6">
@@ -132,19 +126,36 @@ export default async function DashboardPage() {
       </div>
 
       <div className="rounded-lg border border-border bg-surface p-4">
-        <p className="mb-2 text-sm font-medium text-foreground">Aniversariantes do mês</p>
-        {birthdays.length === 0 ? (
-          <p className="text-sm text-muted-foreground">Nenhum cliente com aniversário cadastrado este mês.</p>
-        ) : (
-          <ul className="flex flex-wrap gap-2">
-            {birthdays.map((c, i) => (
-              <li key={i} className="rounded-full bg-gold-100 px-3 py-1 text-xs text-gold-800">
-                {String(new Date(c.birth_date + "T00:00:00").getDate()).padStart(2, "0")} · {c.name}
-                {c.phone ? ` · ${c.phone}` : ""}
-              </li>
-            ))}
-          </ul>
-        )}
+        <div className="mb-3 flex items-center justify-between">
+          <p className="text-sm font-medium text-foreground">Radar de oportunidades</p>
+          <Link href="/radar" className="text-xs text-gold-700 underline underline-offset-2 dark:text-gold-400">
+            Abrir radar
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div>
+            <p className="text-xs text-muted-foreground">Risco de perda</p>
+            <p className="text-xl font-medium text-destructive">{radarCounts.risco_perda ?? 0}</p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Hora de voltar</p>
+            <p className="text-xl font-medium text-gold-600 dark:text-gold-400">
+              {radarCounts.hora_de_voltar ?? 0}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Aniversariantes</p>
+            <p className="text-xl font-medium text-gold-600 dark:text-gold-400">
+              {radarCounts.aniversariante ?? 0}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Cross-sell</p>
+            <p className="text-xl font-medium text-gold-600 dark:text-gold-400">
+              {(radarCounts.cross_estetica ?? 0) + (radarCounts.cross_laser ?? 0)}
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
