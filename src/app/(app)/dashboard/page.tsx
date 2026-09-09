@@ -82,6 +82,11 @@ export default async function DashboardPage() {
     .map(([name, { total, count }]) => ({ name, total, count, ticket: count > 0 ? total / count : 0 }))
     .sort((a, b) => b.total - a.total);
 
+  const settingsRes = await supabase.from("org_settings").select("*").single();
+  const cfg = (settingsRes.data ?? {
+    recorrente_alerta: 37, recorrente_limite: 40, ticket_atencao: 650, ticket_meta: 850,
+  }) as { recorrente_alerta: number; recorrente_limite: number; ticket_atencao: number; ticket_meta: number };
+
   const radarRes = await supabase.from("client_intelligence").select("bucket");
   const radarCounts: Record<string, number> = {};
   for (const row of radarRes.data ?? []) {
@@ -108,7 +113,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <RecorrenteAlert pct={recorrentePct} />
+        <RecorrenteAlert pct={recorrentePct} alerta={Number(cfg.recorrente_alerta)} limite={Number(cfg.recorrente_limite)} />
 
         <div className="rounded-lg border border-border bg-surface p-4">
           <p className="mb-2 text-sm font-medium text-foreground">Revenda x Venda nova</p>
@@ -174,9 +179,9 @@ export default async function DashboardPage() {
           </thead>
           <tbody>
             {sellerRanking.map((s) => {
-              const farol = s.ticket >= 850 ? "Meta batida" : s.ticket >= 650 ? "Atenção" : "Abaixo do ideal";
+              const farol = s.ticket >= Number(cfg.ticket_meta) ? "Meta batida" : s.ticket >= Number(cfg.ticket_atencao) ? "Atenção" : "Abaixo do ideal";
               const color =
-                s.ticket >= 850 ? "bg-gold-100 text-gold-800" : s.ticket >= 650 ? "bg-muted text-gold-700" : "bg-ink-100 text-muted-foreground";
+                s.ticket >= Number(cfg.ticket_meta) ? "bg-gold-100 text-gold-800" : s.ticket >= Number(cfg.ticket_atencao) ? "bg-muted text-gold-700" : "bg-muted text-muted-foreground";
               return (
                 <tr key={s.name} className="border-t border-border">
                   <td className="px-4 py-2">{s.name}</td>

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
 import { ManageableList } from "@/components/manageable-list";
+import { SettingsForm } from "@/components/settings-form";
 
 export default async function ConfiguracoesPage() {
   const supabase = createClient();
@@ -31,6 +32,8 @@ export default async function ConfiguracoesPage() {
   const units = unitsRes.data ?? [];
   const unitOptions = [{ value: "", label: "Sem unidade fixa" }, ...units.map((u) => ({ value: u.id, label: u.name }))];
 
+  const settingsRes = await supabase.from("org_settings").select("*").single();
+
   return (
     <div className="space-y-10">
       <div>
@@ -41,6 +44,18 @@ export default async function ConfiguracoesPage() {
           </p>
         )}
       </div>
+
+      {settingsRes.data && (
+        <section>
+          <h3 className="mb-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">
+            Parâmetros do Radar e metas
+          </h3>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Define as janelas que classificam os clientes no Radar e os limites de alerta do Dashboard.
+          </p>
+          <SettingsForm settings={settingsRes.data as never} canEdit={isAdmin} />
+        </section>
+      )}
 
       <section>
         <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">Procedimentos</h3>

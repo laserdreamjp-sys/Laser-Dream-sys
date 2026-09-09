@@ -40,8 +40,8 @@ export function PaymentMethodChart({ data }: { data: { name: string; total: numb
   );
 }
 
-export function RecorrenteAlert({ pct }: { pct: number }) {
-  const status = pct >= 40 ? "excedido" : pct >= 37 ? "alerta" : "ok";
+export function RecorrenteAlert({ pct, alerta = 37, limite = 40 }: { pct: number; alerta?: number; limite?: number }) {
+  const status = pct >= limite ? "excedido" : pct >= alerta ? "alerta" : "ok";
   const barColor = status === "excedido" ? "#B3432E" : status === "alerta" ? "#D9A93E" : "#7A9B76";
 
   return (
@@ -59,7 +59,7 @@ export function RecorrenteAlert({ pct }: { pct: number }) {
         />
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        Limite de 40% do faturamento em Boleto/Recorrente, alerta a partir de 37%.{" "}
+        {`Limite de ${limite}% do faturamento em Boleto/Recorrente, alerta a partir de ${alerta}%.`}{" "}
         {status === "excedido" && <span className="font-medium text-destructive">Limite ultrapassado.</span>}
         {status === "alerta" && <span className="font-medium text-gold-700">Próximo do limite.</span>}
         {status === "ok" && "Dentro do esperado."}
