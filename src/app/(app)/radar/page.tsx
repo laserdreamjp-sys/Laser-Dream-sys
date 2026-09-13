@@ -59,9 +59,13 @@ export default async function RadarPage({
   const supabase = createClient();
   const { isAdmin } = await getCurrentProfile();
 
+  const unitsRes = await supabase.from("units").select("id, name").eq("active", true).order("name");
+  const units = unitsRes.data ?? [];
+  const unidadeFiltro = searchParams.unidade || null;
+
   const { data } = await supabase
     .from("client_intelligence")
-    .select("client_id, name, phone, dias_desde_ultima, valor_total, total_compras, bucket, tier")
+    .select("client_id, name, phone, dias_desde_ultima, valor_total, total_compras, bucket, tier, unit_id")
     .order("valor_total", { ascending: false });
 
   let clients = (data ?? []) as unknown as RadarClient[];
@@ -79,6 +83,7 @@ export default async function RadarPage({
   if (diasMax !== null)
     clients = clients.filter((c) => c.dias_desde_ultima !== null && c.dias_desde_ultima <= diasMax);
   if (tierFiltro) clients = clients.filter((c) => c.tier === tierFiltro);
+  if (unidadeFiltro) clients = clients.filter((c) => c.unit_id === unidadeFiltro);
 
   const filtrosAtivos = valorMin !== null || valorMax !== null || diasMin !== null || diasMax !== null || !!tierFiltro;
 
@@ -132,6 +137,8 @@ export default async function RadarPage({
         diasMin={searchParams.diasMin ?? ""}
         diasMax={searchParams.diasMax ?? ""}
         tier={searchParams.tier ?? ""}
+        unidade={searchParams.unidade ?? ""}
+        units={units}
       />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

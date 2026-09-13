@@ -9,16 +9,20 @@ export function RadarFilters({
   diasMin,
   diasMax,
   tier,
+  unidade,
+  units,
 }: {
   valorMin: string;
   valorMax: string;
   diasMin: string;
   diasMax: string;
   tier: string;
+  unidade: string;
+  units: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [form, setForm] = useState({ valorMin, valorMax, diasMin, diasMax, tier });
+  const [form, setForm] = useState({ valorMin, valorMax, diasMin, diasMax, tier, unidade });
 
   const hasFilters = Object.values(form).some((v) => v !== "");
 
@@ -31,7 +35,7 @@ export function RadarFilters({
   }
 
   function clear() {
-    setForm({ valorMin: "", valorMax: "", diasMin: "", diasMax: "", tier: "" });
+    setForm({ valorMin: "", valorMax: "", diasMin: "", diasMax: "", tier: "", unidade: "" });
     router.push(pathname);
   }
 
@@ -76,6 +80,21 @@ export function RadarFilters({
           onChange={(e) => setForm((p) => ({ ...p, diasMax: e.target.value }))}
           className="w-24 rounded-md border border-border bg-background px-2 py-1.5"
         />
+      </label>
+      <label className="text-xs">
+        <span className="mb-1 block text-muted-foreground">Unidade</span>
+        <select
+          value={form.unidade}
+          onChange={(e) => setForm((p) => ({ ...p, unidade: e.target.value }))}
+          className="rounded-md border border-border bg-background px-2 py-1.5"
+        >
+          <option value="">Todas</option>
+          {units.map((u) => (
+            <option key={u.id} value={u.id}>
+              {u.name}
+            </option>
+          ))}
+        </select>
       </label>
       <label className="text-xs">
         <span className="mb-1 block text-muted-foreground">Classificação</span>

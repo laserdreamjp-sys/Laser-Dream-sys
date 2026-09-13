@@ -42,11 +42,33 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
 
   if (!client) notFound();
 
-  const { data: intel } = await supabase
+  const { data: intelRows } = await supabase
     .from("client_intelligence")
-    .select("valor_total, total_compras, dias_desde_ultima, ticket_medio, tier, bucket")
-    .eq("client_id", params.id)
-    .maybeSingle();
+    .select("unit_id, valor_total, total_compras, dias_desde_ultima, tier")
+    .eq("client_id", params.id);
+
+  const rows = intelRows ?? [];
+  const valorTotal = rows.reduce((acc, r) => acc + Number(r.valor_total ?? 0), 0);
+  const totalCompras = rows.reduce((acc, r) => acc + Number(r.total_compras ?? 0), 0);
+  const diasDesdeUltima = rows
+    .map((r) => r.dias_desde_ultima)
+    .filter((d): d is number => d !== null && d !== undefined)
+    .reduce<number | null>((min, d) => (min === null || d < min ? d : min), null);
+  const ticketMedio = totalCompras > 0 ? valorTotal / totalCompras : 0;
+
+  const TIER_ORDER = ["Bronze", "Prata", "Ouro", "Diamante"];
+  const tier =
+    rows
+      .map((r) => r.tier as string)
+      .sort((a, b) => TIER_ORDER.indexOf(b) - TIER_ORDER.indexOf(a))[0] ?? "Bronze";
+
+  const intel = {
+    valor_total: valorTotal,
+    total_compras: totalCompras,
+    dias_desde_ultima: diasDesdeUltima,
+    ticket_medio: ticketMedio,
+    tier,
+  };
 
   const { data: salesData } = await supabase
     .from("sales")
@@ -96,7 +118,6 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     feito: procedimentosFeitos.has(p.name),
   }));
 
-  const tier = intel?.tier as string | undefined;
 
   return (
     <div className="space-y-6">

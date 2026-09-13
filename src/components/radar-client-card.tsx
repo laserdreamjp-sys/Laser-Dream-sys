@@ -13,6 +13,7 @@ export type RadarClient = {
   total_compras: number;
   bucket: string;
   tier?: string;
+  unit_id?: string | null;
 };
 
 const TIER_STYLE: Record<string, string> = {
