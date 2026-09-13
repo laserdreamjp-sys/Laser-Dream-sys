@@ -64,17 +64,22 @@ export function DuplicatesPanel({ flags: initialFlags }: { flags: Flag[] }) {
   }
 
   async function unifyClients(flag: ClienteFlag) {
-    if (!confirm(`Unificar "${flag.detail.nome_a}" e "${flag.detail.nome_b}"? As compras do segundo migram para o primeiro, e o registro duplicado é removido.`))
+    if (!confirm(`Unificar "${flag.detail.nome_a}" e "${flag.detail.nome_b}"? As compras migram para o primeiro cadastro, os dados que faltarem nele são herdados do segundo, e uma cópia integral da ficha absorvida fica guardada na auditoria.`))
       return;
     setBusyId(flag.id);
 
-    await supabase.from("sales").update({ client_id: flag.record_a }).eq("client_id", flag.record_b);
-    await supabase.from("opportunities").update({ client_id: flag.record_a }).eq("client_id", flag.record_b);
-    await supabase.from("clients").delete().eq("id", flag.record_b);
-    await supabase.from("duplicate_flags").update({ status: "confirmado" }).eq("id", flag.id);
+    const { error } = await supabase.rpc("merge_clients", {
+      keep_id: flag.record_a,
+      absorb_id: flag.record_b,
+    });
+
+    setBusyId(null);
+    if (error) {
+      alert(`Não foi possível unificar: ${error.message}`);
+      return;
+    }
 
     setFlags((prev) => prev.filter((f) => f.id !== flag.id));
-    setBusyId(null);
     router.refresh();
   }
 

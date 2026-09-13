@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { NewClientForm } from "@/components/new-client-form";
+import { formatCpf } from "@/lib/cpf";
 
 export default async function ClientesPage() {
   const supabase = createClient();
@@ -19,7 +20,7 @@ export default async function ClientesPage() {
 
   const { data: clients } = await supabase
     .from("clients")
-    .select("id, name, phone, email, birth_date, created_at")
+    .select("id, name, cpf, phone, email, birth_date, created_at")
     .order("name");
 
   function formatBirthDate(value: string | null) {
@@ -39,6 +40,7 @@ export default async function ClientesPage() {
           <thead className="bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-4 py-3">Nome</th>
+              <th className="px-4 py-3">CPF</th>
               <th className="px-4 py-3">Telefone</th>
               <th className="px-4 py-3">E-mail</th>
               <th className="px-4 py-3">Aniversário</th>
@@ -52,6 +54,7 @@ export default async function ClientesPage() {
                     {client.name}
                   </Link>
                 </td>
+                <td className="px-4 py-3 text-xs text-muted-foreground">{formatCpf(client.cpf) || "-"}</td>
                 <td className="px-4 py-3">{client.phone ?? "-"}</td>
                 <td className="px-4 py-3">{client.email ?? "-"}</td>
                 <td className="px-4 py-3">{formatBirthDate(client.birth_date)}</td>

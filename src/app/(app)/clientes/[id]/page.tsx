@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { formatCpf } from "@/lib/cpf";
 
 function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -35,7 +36,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
 
   const { data: client } = await supabase
     .from("clients")
-    .select("id, name, phone, email, birth_date")
+    .select("id, name, cpf, phone, email, birth_date, cep, logradouro, numero, complemento, bairro, cidade, uf")
     .eq("id", params.id)
     .single();
 
@@ -113,8 +114,20 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
           )}
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
+          {client.cpf ? `CPF ${formatCpf(client.cpf)} · ` : ""}
           {client.phone ?? "sem telefone"} {client.email ? `· ${client.email}` : ""}
         </p>
+        {(client.logradouro || client.cidade) && (
+          <p className="mt-1 text-sm text-muted-foreground">
+            {[
+              client.logradouro && `${client.logradouro}${client.numero ? `, ${client.numero}` : ""}`,
+              client.complemento,
+              client.bairro,
+              client.cidade && `${client.cidade}${client.uf ? `/${client.uf}` : ""}`,
+              client.cep,
+            ].filter(Boolean).join(" · ")}
+          </p>
+        )}
 
         <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
           <div>

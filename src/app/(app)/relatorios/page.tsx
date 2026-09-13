@@ -72,12 +72,20 @@ export default async function RelatoriosPage({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-display font-semibold text-2xl text-foreground">Relatórios</h2>
         {isAdmin && (
-          <a
-            href="/api/relatorios/clientes-procedimentos"
-            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
-          >
-            Exportar clientes x procedimentos (CSV)
-          </a>
+          <div className="flex flex-wrap gap-2">
+            <a
+              href="/api/relatorios/clientes-completo"
+              className="rounded-md bg-gold-500 px-4 py-2 text-sm font-medium text-white hover:bg-gold-600"
+            >
+              Cadastro + vendas (CSV)
+            </a>
+            <a
+              href="/api/relatorios/clientes-procedimentos"
+              className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+            >
+              Exportar clientes x procedimentos (CSV)
+            </a>
+          </div>
         )}
       </div>
 
