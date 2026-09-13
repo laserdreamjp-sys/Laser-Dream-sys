@@ -33,19 +33,20 @@ export default async function RelatoriosPage({
   let doneAreaIds = new Set<string>();
 
   if (selectedClientId) {
-    const { data } = await supabase
+    const { data, error: histErr } = await supabase
       .from("sales")
       .select("id, sale_date, amount, procedures(id, name, segment)")
       .eq("client_id", selectedClientId)
       .eq("status", "ativa")
       .order("sale_date", { ascending: false });
 
+    if (histErr) throw new Error(`Falha ao carregar o histórico: ${histErr.message}`);
     history = (data ?? []) as unknown as HistoryRow[];
     doneProcedureIds = new Set(history.map((h) => h.procedures?.id).filter(Boolean) as string[]);
 
     const saleIds = history.map((h) => h.id);
     if (saleIds.length > 0) {
-      const { data: areasData } = await supabase
+      const { data: areasData, error: areasErr2 } = await supabase
         .from("sale_areas")
         .select("area_id")
         .in("sale_id", saleIds);

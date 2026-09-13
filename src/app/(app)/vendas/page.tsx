@@ -101,10 +101,12 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
   const saleIds = sales.map((s) => s.id);
   const areasBySale = new Map<string, string[]>();
   if (saleIds.length > 0) {
-    const { data: saleAreasRaw } = await supabase
+    const { data: saleAreasRaw, error: areasErr } = await supabase
       .from("sale_areas")
       .select("sale_id, procedure_areas(name)")
       .in("sale_id", saleIds);
+
+    if (areasErr) throw new Error(`Falha ao carregar as áreas das vendas: ${areasErr.message}`);
 
     type SaleAreaRow = { sale_id: string; procedure_areas: { name: string } | null };
     for (const row of (saleAreasRaw ?? []) as unknown as SaleAreaRow[]) {

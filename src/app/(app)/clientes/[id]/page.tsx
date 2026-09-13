@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { formatCpf } from "@/lib/cpf";
+import { unwrap } from "@/lib/unwrap";
 
 function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -42,12 +43,12 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
 
   if (!client) notFound();
 
-  const { data: intelRows } = await supabase
+  const intelRes = await supabase
     .from("client_intelligence")
     .select("unit_id, valor_total, total_compras, dias_desde_ultima, tier")
     .eq("client_id", params.id);
 
-  const rows = intelRows ?? [];
+  const rows = unwrap(intelRes, "o resumo do cliente") as { unit_id: string | null; valor_total: number; total_compras: number; dias_desde_ultima: number | null; tier: string }[];
   const valorTotal = rows.reduce((acc, r) => acc + Number(r.valor_total ?? 0), 0);
   const totalCompras = rows.reduce((acc, r) => acc + Number(r.total_compras ?? 0), 0);
   const diasDesdeUltima = rows
@@ -70,7 +71,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     tier,
   };
 
-  const { data: salesData } = await supabase
+  const salesRes = await supabase
     .from("sales")
     .select(
       "id, sale_date, amount, status, procedures(name, segment), payment_methods(name), sellers(name), co_seller:sellers!sales_co_seller_id_fkey(name), sale_areas(procedure_areas(name))"
@@ -78,9 +79,9 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     .eq("client_id", params.id)
     .order("sale_date", { ascending: false });
 
-  const sales = (salesData ?? []) as unknown as SaleRow[];
+  const sales = unwrap(salesRes, "o histórico de compras") as unknown as SaleRow[];
 
-  const { data: allAreas } = await supabase
+  const areasRes = await supabase
     .from("procedure_areas")
     .select("name, group_label")
     .eq("segment", "laser")
@@ -88,7 +89,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     .order("group_label")
     .order("name");
 
-  const { data: allProcedures } = await supabase
+  const procsRes = await supabase
     .from("procedures")
     .select("name")
     .eq("segment", "estetica")
@@ -107,13 +108,15 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   }
 
   const areasPorGrupo = new Map<string, { name: string; feito: boolean }[]>();
-  for (const a of allAreas ?? []) {
+  const allAreas = unwrap(areasRes, "as áreas de laser") as { name: string; group_label: string }[];
+  for (const a of allAreas) {
     const list = areasPorGrupo.get(a.group_label) ?? [];
     list.push({ name: a.name, feito: areasFeitas.has(a.name) });
     areasPorGrupo.set(a.group_label, list);
   }
 
-  const procedimentosComStatus = (allProcedures ?? []).map((p) => ({
+  const allProcedures = unwrap(procsRes, "os procedimentos de estética") as { name: string }[];
+  const procedimentosComStatus = allProcedures.map((p) => ({
     name: p.name,
     feito: procedimentosFeitos.has(p.name),
   }));
