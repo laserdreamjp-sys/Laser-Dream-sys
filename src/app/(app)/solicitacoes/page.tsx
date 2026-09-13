@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
 import { RequestActions, TABLE_LABELS, type ChangeRequest } from "@/components/request-actions";
+import { DuplicatesPanel } from "@/components/duplicates-panel";
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString("pt-BR");
@@ -69,6 +70,12 @@ export default async function SolicitacoesPage() {
     .eq("status", "pendente")
     .order("requested_at", { ascending: true });
 
+  const duplicatesRes = await supabase
+    .from("duplicate_flags")
+    .select("id, kind, record_a, record_b, similarity, detail")
+    .eq("status", "pendente")
+    .order("created_at", { ascending: false });
+
   const resolvedRes = await supabase
     .from("change_requests")
     .select("id, table_name, record_id, record_label, action, status, requested_at, resolved_at, profiles!change_requests_requested_by_fkey(full_name)")
@@ -96,6 +103,8 @@ export default async function SolicitacoesPage() {
         <h2 className="font-display font-semibold text-2xl text-foreground">Solicitações</h2>
         <p className="text-sm text-muted-foreground">Alterações e exclusões pedidas pela equipe, aguardando aprovação.</p>
       </div>
+
+      <DuplicatesPanel flags={(duplicatesRes.data ?? []) as never} />
 
       <section>
         <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">Pendentes</h3>
