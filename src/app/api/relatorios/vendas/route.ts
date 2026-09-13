@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/current-profile";
 
 function csvEscape(value: unknown) {
   const str = String(value ?? "");
@@ -11,6 +12,11 @@ function csvEscape(value: unknown) {
 
 export async function GET(request: NextRequest) {
   const supabase = createClient();
+
+  const profile = await getCurrentProfile();
+  if (!profile.isAdmin) {
+    return NextResponse.json({ error: "Apenas o administrador pode exportar relatórios." }, { status: 403 });
+  }
   const { searchParams } = new URL(request.url);
 
   let query = supabase

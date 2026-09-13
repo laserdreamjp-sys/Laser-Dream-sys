@@ -1,5 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/current-profile";
 import { RadarClientCard, type RadarClient } from "@/components/radar-client-card";
+import { RadarFilters } from "@/components/radar-filters";
 
 function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -49,15 +51,36 @@ const BUCKETS: {
   },
 ];
 
-export default async function RadarPage() {
+export default async function RadarPage({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | undefined };
+}) {
   const supabase = createClient();
+  const { isAdmin } = await getCurrentProfile();
 
   const { data } = await supabase
     .from("client_intelligence")
-    .select("client_id, name, phone, dias_desde_ultima, valor_total, total_compras, bucket")
+    .select("client_id, name, phone, dias_desde_ultima, valor_total, total_compras, bucket, tier")
     .order("valor_total", { ascending: false });
 
-  const clients = (data ?? []) as unknown as RadarClient[];
+  let clients = (data ?? []) as unknown as RadarClient[];
+
+  const valorMin = searchParams.valorMin ? Number(searchParams.valorMin) : null;
+  const valorMax = searchParams.valorMax ? Number(searchParams.valorMax) : null;
+  const diasMin = searchParams.diasMin ? Number(searchParams.diasMin) : null;
+  const diasMax = searchParams.diasMax ? Number(searchParams.diasMax) : null;
+  const tierFiltro = searchParams.tier || null;
+
+  if (valorMin !== null) clients = clients.filter((c) => Number(c.valor_total) >= valorMin);
+  if (valorMax !== null) clients = clients.filter((c) => Number(c.valor_total) <= valorMax);
+  if (diasMin !== null)
+    clients = clients.filter((c) => c.dias_desde_ultima !== null && c.dias_desde_ultima >= diasMin);
+  if (diasMax !== null)
+    clients = clients.filter((c) => c.dias_desde_ultima !== null && c.dias_desde_ultima <= diasMax);
+  if (tierFiltro) clients = clients.filter((c) => c.tier === tierFiltro);
+
+  const filtrosAtivos = valorMin !== null || valorMax !== null || diasMin !== null || diasMax !== null || !!tierFiltro;
 
   const byBucket = new Map<string, RadarClient[]>();
   for (const c of clients) {
@@ -80,6 +103,10 @@ export default async function RadarPage() {
     0
   );
 
+  const exportParams = new URLSearchParams(
+    Object.fromEntries(Object.entries(searchParams).filter(([, v]) => v)) as Record<string, string>
+  ).toString();
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -89,13 +116,23 @@ export default async function RadarPage() {
             A base de clientes lida como fila de trabalho: quem contatar hoje, por quê, e com qual mensagem.
           </p>
         </div>
-        <a
-          href="/api/relatorios/radar"
-          className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
-        >
-          Baixar lista (CSV)
-        </a>
+        {isAdmin && (
+          <a
+            href={`/api/relatorios/radar${exportParams ? `?${exportParams}` : ""}`}
+            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+          >
+            Baixar lista (CSV)
+          </a>
+        )}
       </div>
+
+      <RadarFilters
+        valorMin={searchParams.valorMin ?? ""}
+        valorMax={searchParams.valorMax ?? ""}
+        diasMin={searchParams.diasMin ?? ""}
+        diasMax={searchParams.diasMax ?? ""}
+        tier={searchParams.tier ?? ""}
+      />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="rounded-lg border border-border bg-surface p-5 shadow-soft">

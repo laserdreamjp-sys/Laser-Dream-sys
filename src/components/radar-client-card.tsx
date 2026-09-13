@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { MessageCircle, Copy, Check } from "lucide-react";
 
@@ -11,6 +12,14 @@ export type RadarClient = {
   valor_total: number;
   total_compras: number;
   bucket: string;
+  tier?: string;
+};
+
+const TIER_STYLE: Record<string, string> = {
+  Diamante: "bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300",
+  Ouro: "bg-gold-100 text-gold-800 dark:bg-gold-900/40 dark:text-gold-300",
+  Prata: "bg-muted text-foreground",
+  Bronze: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300",
 };
 
 function formatCurrency(value: number) {
@@ -68,7 +77,16 @@ export function RadarClientCard({ client }: { client: RadarClient }) {
   return (
     <li className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium text-foreground">{client.name}</p>
+        <p className="truncate text-sm font-medium text-foreground">
+          <Link href={`/clientes/${client.client_id}`} className="hover:underline">
+            {client.name}
+          </Link>
+          {client.tier && (
+            <span className={`ml-2 rounded-full px-1.5 py-0.5 align-middle text-[10px] font-medium ${TIER_STYLE[client.tier] ?? "bg-muted"}`}>
+              {client.tier}
+            </span>
+          )}
+        </p>
         <p className="text-xs text-muted-foreground">
           {client.dias_desde_ultima !== null
             ? `${client.dias_desde_ultima} dias desde a última compra`

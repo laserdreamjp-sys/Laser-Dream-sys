@@ -122,12 +122,14 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
           <MonthSwitcher currentMonth={selectedMonth} basePath="/vendas" otherParams={otherParams} />
         </div>
         <div className="flex gap-2">
-          <a
-            href={`/api/relatorios/vendas?${exportParams}`}
-            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
-          >
-            Baixar CSV
-          </a>
+          {isAdmin && (
+            <a
+              href={`/api/relatorios/vendas?${exportParams}`}
+              className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+            >
+              Baixar CSV
+            </a>
+          )}
           <Link
             href="/vendas/novo"
             className="rounded-md bg-gold-500 px-4 py-2 text-sm font-medium text-white hover:bg-gold-600"

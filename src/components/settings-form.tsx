@@ -15,6 +15,9 @@ type Settings = {
   recorrente_limite: number;
   ticket_atencao: number;
   ticket_meta: number;
+  tier_prata: number;
+  tier_ouro: number;
+  tier_diamante: number;
 };
 
 const FIELDS: { key: keyof Settings; label: string; hint: string; suffix: string }[] = [
@@ -27,6 +30,9 @@ const FIELDS: { key: keyof Settings; label: string; hint: string; suffix: string
   { key: "recorrente_limite", label: "Limite de Boleto/Recorrente", hint: "Percentual em que a barra fica vermelha.", suffix: "%" },
   { key: "ticket_atencao", label: "Ticket de atenção", hint: "Abaixo disso o farol da vendedora fica vermelho.", suffix: "R$" },
   { key: "ticket_meta", label: "Ticket meta", hint: "A partir disso o farol fica verde.", suffix: "R$" },
+  { key: "tier_prata", label: "Classificação Prata a partir de", hint: "Valor total gasto pela cliente para virar Prata.", suffix: "R$" },
+  { key: "tier_ouro", label: "Classificação Ouro a partir de", hint: "Valor total gasto pela cliente para virar Ouro.", suffix: "R$" },
+  { key: "tier_diamante", label: "Classificação Diamante a partir de", hint: "Valor total gasto pela cliente para virar Diamante.", suffix: "R$" },
 ];
 
 export function SettingsForm({ settings, canEdit }: { settings: Settings; canEdit: boolean }) {

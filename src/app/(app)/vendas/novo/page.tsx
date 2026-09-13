@@ -44,6 +44,7 @@ export default async function NovaVendaPage() {
     .select("id, name, code")
     .eq("active", true)
     .order("name");
+  const sellerPairsRes = await supabase.from("seller_pairs").select("seller_id, partner_id");
 
   return (
     <div>
@@ -58,6 +59,7 @@ export default async function NovaVendaPage() {
         areas={areasRes.data ?? []}
         paymentMethods={paymentMethodsRes.data ?? []}
         leadOrigins={leadOriginsRes.data ?? []}
+        sellerPairs={sellerPairsRes.data ?? []}
       />
     </div>
   );

@@ -21,6 +21,7 @@ export function NewSaleForm({
   areas,
   paymentMethods,
   leadOrigins,
+  sellerPairs,
 }: {
   organizationId: string;
   userId: string;
@@ -31,6 +32,7 @@ export function NewSaleForm({
   areas: Area[];
   paymentMethods: CatalogItem[];
   leadOrigins: CatalogItem[];
+  sellerPairs: { seller_id: string; partner_id: string }[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -39,6 +41,8 @@ export function NewSaleForm({
   const [unitId, setUnitId] = useState(units[0]?.id ?? "");
   const [clientId, setClientId] = useState("");
   const [sellerId, setSellerId] = useState("");
+  const [coSellerId, setCoSellerId] = useState("");
+  const [isDupla, setIsDupla] = useState(false);
   const [leadOriginId, setLeadOriginId] = useState(leadOrigins[0]?.id ?? "");
 
   const [segment, setSegment] = useState<"laser" | "estetica">("laser");
@@ -57,6 +61,33 @@ export function NewSaleForm({
   const sellersForUnit = useMemo(
     () => sellers.filter((s) => !s.unit_id || s.unit_id === unitId),
     [sellers, unitId]
+  );
+
+  const defaultPartnerMap = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of sellerPairs) map.set(p.seller_id, p.partner_id);
+    return map;
+  }, [sellerPairs]);
+
+  function handleSellerChange(nextSellerId: string) {
+    setSellerId(nextSellerId);
+    const defaultPartner = defaultPartnerMap.get(nextSellerId) ?? "";
+    setCoSellerId(defaultPartner);
+    setIsDupla(!!defaultPartner);
+  }
+
+  function toggleDupla(checked: boolean) {
+    setIsDupla(checked);
+    if (checked) {
+      setCoSellerId(defaultPartnerMap.get(sellerId) ?? "");
+    } else {
+      setCoSellerId("");
+    }
+  }
+
+  const coSellerOptions = useMemo(
+    () => sellersForUnit.filter((s) => s.id !== sellerId),
+    [sellersForUnit, sellerId]
   );
 
   const proceduresForSegment = useMemo(
@@ -112,6 +143,7 @@ export function NewSaleForm({
         payment_method_id: paymentMethodId,
         lead_origin_id: leadOriginId,
         seller_id: sellerId,
+        co_seller_id: isDupla && coSellerId ? coSellerId : null,
         transaction_code: transactionCode || null,
         notes: notes || null,
         created_by: userId,
@@ -163,6 +195,8 @@ export function NewSaleForm({
               onChange={(e) => {
                 setUnitId(e.target.value);
                 setSellerId("");
+                setCoSellerId("");
+                setIsDupla(false);
               }}
               className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
             >
@@ -189,7 +223,7 @@ export function NewSaleForm({
             <select
               required
               value={sellerId}
-              onChange={(e) => setSellerId(e.target.value)}
+              onChange={(e) => handleSellerChange(e.target.value)}
               className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
             >
               <option value="" disabled>
@@ -205,6 +239,33 @@ export function NewSaleForm({
               <p className="mt-1 text-xs text-muted-foreground">
                 Nenhuma vendedora cadastrada nesta unidade ainda. Cadastre em Configurações.
               </p>
+            )}
+
+            {sellerId && (
+              <div className="mt-2 space-y-2">
+                <label className="flex items-center gap-2 text-xs text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={isDupla}
+                    onChange={(e) => toggleDupla(e.target.checked)}
+                  />
+                  Venda em dupla
+                </label>
+                {isDupla && (
+                  <select
+                    value={coSellerId}
+                    onChange={(e) => setCoSellerId(e.target.value)}
+                    className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
+                  >
+                    <option value="">Selecione a parceira</option>
+                    {coSellerOptions.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
             )}
           </Field>
 

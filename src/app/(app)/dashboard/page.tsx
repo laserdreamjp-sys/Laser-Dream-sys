@@ -41,8 +41,7 @@ export default async function DashboardPage() {
   const totalSaidas = cashOut.reduce((acc, c) => acc + Number(c.amount), 0);
   const saldoCaixa = totalEntradas - totalSaidas;
 
-  const cards = [
-    { label: "Faturamento do mês", value: formatCurrency(faturamento) },
+  const cardsSecundarios = [
     { label: "Ticket médio", value: formatCurrency(ticketMedio) },
     { label: "Número de vendas", value: String(numeroVendas) },
     { label: "Saldo em caixa", value: formatCurrency(saldoCaixa) },
@@ -62,10 +61,13 @@ export default async function DashboardPage() {
   }
   const paymentData = Array.from(paymentTotals.entries()).map(([name, total]) => ({ name, total }));
 
-  const recorrenteTotal = sales
-    .filter((s) => s.payment_methods?.code === "boleto_recorrente")
+  const laserTotal = sales
+    .filter((s) => s.procedures?.segment === "laser")
     .reduce((acc, s) => acc + Number(s.amount), 0);
-  const recorrentePct = faturamento > 0 ? (recorrenteTotal / faturamento) * 100 : 0;
+  const recorrenteTotal = sales
+    .filter((s) => s.procedures?.segment === "laser" && s.payment_methods?.code === "boleto_recorrente")
+    .reduce((acc, s) => acc + Number(s.amount), 0);
+  const recorrentePct = laserTotal > 0 ? (recorrenteTotal / laserTotal) * 100 : 0;
 
   const revendaTotal = sales.filter((s) => s.tipo_venda === "REVENDA").reduce((acc, s) => acc + Number(s.amount), 0);
   const novaTotal = sales.filter((s) => s.tipo_venda === "VENDA NOVA").reduce((acc, s) => acc + Number(s.amount), 0);
@@ -98,8 +100,15 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <h2 className="font-display font-semibold text-2xl text-foreground">Dashboard</h2>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {cards.map((card) => (
+      <div className="rounded-lg border border-gold-300 bg-gold-50 p-6 shadow-soft dark:border-gold-700 dark:bg-gold-900/20">
+        <p className="mb-1 text-xs text-gold-700 dark:text-gold-300">Faturamento do mês</p>
+        <p className="font-display text-4xl font-semibold text-gold-700 dark:text-gold-300">
+          {formatCurrency(faturamento)}
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        {cardsSecundarios.map((card) => (
           <div key={card.label} className="rounded-lg border border-border bg-surface p-5 shadow-soft">
             <p className="mb-1 text-xs text-muted-foreground">{card.label}</p>
             <p className="font-display text-2xl font-semibold text-gold-600 dark:text-gold-400">{card.value}</p>

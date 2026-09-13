@@ -47,7 +47,7 @@ export function RecorrenteAlert({ pct, alerta = 37, limite = 40 }: { pct: number
   return (
     <div className="rounded-lg border border-border bg-surface p-4">
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-sm font-medium text-foreground">Concentração Boleto / Recorrente</p>
+        <p className="text-sm font-medium text-foreground">Concentração Boleto / Recorrente (laser)</p>
         <span className="text-lg font-medium" style={{ color: barColor }}>
           {pct.toFixed(1)}%
         </span>
@@ -59,7 +59,7 @@ export function RecorrenteAlert({ pct, alerta = 37, limite = 40 }: { pct: number
         />
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        {`Limite de ${limite}% do faturamento em Boleto/Recorrente, alerta a partir de ${alerta}%.`}{" "}
+        {`Limite de ${limite}% do faturamento de laser em Boleto/Recorrente, alerta a partir de ${alerta}%. Estética não entra nesse cálculo.`}{" "}
         {status === "excedido" && <span className="font-medium text-destructive">Limite ultrapassado.</span>}
         {status === "alerta" && <span className="font-medium text-gold-700">Próximo do limite.</span>}
         {status === "ok" && "Dentro do esperado."}

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { NewClientForm } from "@/components/new-client-form";
 
@@ -46,7 +47,11 @@ export default async function ClientesPage() {
           <tbody>
             {(clients ?? []).map((client) => (
               <tr key={client.id} className="border-t border-border">
-                <td className="px-4 py-3">{client.name}</td>
+                <td className="px-4 py-3">
+                  <Link href={`/clientes/${client.id}`} className="text-gold-700 hover:underline dark:text-gold-400">
+                    {client.name}
+                  </Link>
+                </td>
                 <td className="px-4 py-3">{client.phone ?? "-"}</td>
                 <td className="px-4 py-3">{client.email ?? "-"}</td>
                 <td className="px-4 py-3">{formatBirthDate(client.birth_date)}</td>

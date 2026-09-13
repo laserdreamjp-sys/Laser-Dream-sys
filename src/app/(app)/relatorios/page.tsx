@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/current-profile";
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("pt-BR", { timeZone: "UTC" });
@@ -14,6 +15,7 @@ export default async function RelatoriosPage({
   searchParams: { cliente?: string };
 }) {
   const supabase = createClient();
+  const { isAdmin } = await getCurrentProfile();
 
   const clientsRes = await supabase.from("clients").select("id, name").order("name");
   const clients = clientsRes.data ?? [];
@@ -69,12 +71,14 @@ export default async function RelatoriosPage({
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-display font-semibold text-2xl text-foreground">Relatórios</h2>
-        <a
-          href="/api/relatorios/clientes-procedimentos"
-          className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
-        >
-          Exportar clientes x procedimentos (CSV)
-        </a>
+        {isAdmin && (
+          <a
+            href="/api/relatorios/clientes-procedimentos"
+            className="rounded-md border border-border px-4 py-2 text-sm text-foreground hover:bg-muted"
+          >
+            Exportar clientes x procedimentos (CSV)
+          </a>
+        )}
       </div>
 
       <section className="rounded-lg border border-border bg-surface p-4">
