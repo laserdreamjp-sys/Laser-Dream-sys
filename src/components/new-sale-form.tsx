@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ClientAutocomplete } from "@/components/client-autocomplete";
@@ -22,6 +22,9 @@ export function NewSaleForm({
   paymentMethods,
   leadOrigins,
   sellerPairs,
+  opportunityId,
+  initialClientId,
+  initialSellerId,
 }: {
   organizationId: string;
   userId: string;
@@ -33,14 +36,17 @@ export function NewSaleForm({
   paymentMethods: CatalogItem[];
   leadOrigins: CatalogItem[];
   sellerPairs: { seller_id: string; partner_id: string }[];
+  opportunityId?: string;
+  initialClientId?: string;
+  initialSellerId?: string;
 }) {
   const router = useRouter();
   const supabase = createClient();
 
   const [saleDate, setSaleDate] = useState(new Date().toISOString().slice(0, 10));
   const [unitId, setUnitId] = useState(units[0]?.id ?? "");
-  const [clientId, setClientId] = useState("");
-  const [sellerId, setSellerId] = useState("");
+  const [clientId, setClientId] = useState(initialClientId ?? "");
+  const [sellerId, setSellerId] = useState(initialSellerId ?? "");
   const [coSellerId, setCoSellerId] = useState("");
   const [isDupla, setIsDupla] = useState(false);
   const [leadOriginId, setLeadOriginId] = useState(leadOrigins[0]?.id ?? "");
@@ -68,6 +74,15 @@ export function NewSaleForm({
     for (const p of sellerPairs) map.set(p.seller_id, p.partner_id);
     return map;
   }, [sellerPairs]);
+
+  useEffect(() => {
+    if (initialSellerId) {
+      const defaultPartner = defaultPartnerMap.get(initialSellerId) ?? "";
+      setCoSellerId(defaultPartner);
+      setIsDupla(!!defaultPartner);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function handleSellerChange(nextSellerId: string) {
     setSellerId(nextSellerId);
@@ -147,6 +162,7 @@ export function NewSaleForm({
         transaction_code: transactionCode || null,
         notes: notes || null,
         created_by: userId,
+        opportunity_id: opportunityId || null,
       })
       .select("id")
       .single();
@@ -167,6 +183,10 @@ export function NewSaleForm({
         setError(`Venda salva, mas houve um erro ao gravar as áreas: ${areasError.message}`);
         return;
       }
+    }
+
+    if (opportunityId) {
+      await supabase.from("opportunities").update({ sale_id: sale.id }).eq("id", opportunityId);
     }
 
     setSaving(false);

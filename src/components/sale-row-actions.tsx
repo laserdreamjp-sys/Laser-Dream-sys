@@ -80,6 +80,9 @@ export function SaleRowActions({
         .from("sales")
         .update({ status: "cancelada", updated_by: userId })
         .eq("id", saleId);
+      if (!error) {
+        await supabase.from("opportunities").update({ sale_id: null }).eq("sale_id", saleId);
+      }
       setBusy(false);
       if (!error) router.refresh();
       return;

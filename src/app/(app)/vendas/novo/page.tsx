@@ -1,7 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { NewSaleForm } from "@/components/new-sale-form";
 
-export default async function NovaVendaPage() {
+export default async function NovaVendaPage({
+  searchParams,
+}: {
+  searchParams: { opportunityId?: string; clientId?: string; sellerId?: string };
+}) {
   const supabase = createClient();
 
   const {
@@ -60,6 +64,9 @@ export default async function NovaVendaPage() {
         paymentMethods={paymentMethodsRes.data ?? []}
         leadOrigins={leadOriginsRes.data ?? []}
         sellerPairs={sellerPairsRes.data ?? []}
+        opportunityId={searchParams.opportunityId}
+        initialClientId={searchParams.clientId}
+        initialSellerId={searchParams.sellerId}
       />
     </div>
   );

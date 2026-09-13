@@ -17,6 +17,7 @@ import {
   LogOut,
   FileBarChart,
   Radar,
+  Kanban,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -24,6 +25,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/radar", label: "Radar", icon: Radar },
+  { href: "/funil", label: "Funil", icon: Kanban },
   { href: "/vendas", label: "Vendas", icon: ShoppingBag },
   { href: "/caixa", label: "Caixa", icon: Wallet },
   { href: "/clientes", label: "Clientes", icon: Users },
