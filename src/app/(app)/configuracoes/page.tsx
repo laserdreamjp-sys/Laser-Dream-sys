@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
 import { ManageableList } from "@/components/manageable-list";
 import { SettingsForm } from "@/components/settings-form";
+import { BackupPanel } from "@/components/backup-panel";
 
 export default async function ConfiguracoesPage() {
   const supabase = createClient();
@@ -54,6 +55,18 @@ export default async function ConfiguracoesPage() {
             Define as janelas que classificam os clientes no Radar e os limites de alerta do Dashboard.
           </p>
           <SettingsForm settings={settingsRes.data as never} canEdit={isAdmin} />
+        </section>
+      )}
+
+      {isAdmin && (
+        <section>
+          <h3 className="mb-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">
+            Backup
+          </h3>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Cópia de segurança dos dados. Restrito ao administrador.
+          </p>
+          <BackupPanel />
         </section>
       )}
 
