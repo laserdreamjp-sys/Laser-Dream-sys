@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   let query = supabase
     .from("sales")
     .select(
-      "sale_date, amount, status, tipo_venda, classificacao_financeira, transaction_code, notes, clients(name), sellers(name), procedures(name, segment), payment_methods(name), profiles!sales_created_by_fkey(full_name), created_at"
+      "sale_date, amount, status, tipo_venda, classificacao_financeira, transaction_code, notes, clients(name), sellers!sales_seller_id_fkey(name), procedures(name, segment), payment_methods(name), profiles!sales_created_by_fkey(full_name), created_at"
     )
     .order("sale_date", { ascending: false })
     .limit(2000);

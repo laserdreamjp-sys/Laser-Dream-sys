@@ -53,7 +53,7 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
   let query = supabase
     .from("sales")
     .select(
-      "id, sale_date, amount, status, tipo_venda, payment_method_id, notes, created_at, clients(name), sellers(name), procedures(id, name, segment), payment_methods(name), profiles!sales_created_by_fkey(full_name)"
+      "id, sale_date, amount, status, tipo_venda, payment_method_id, notes, created_at, clients(name), sellers!sales_seller_id_fkey(name), procedures(id, name, segment), payment_methods(name), profiles!sales_created_by_fkey(full_name)"
     )
     .gte("sale_date", de)
     .lte("sale_date", ate)
@@ -66,7 +66,16 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
   if (searchParams.tipo) query = query.eq("tipo_venda", searchParams.tipo);
   if (searchParams.status) query = query.eq("status", searchParams.status);
 
-  const { data: salesRaw } = await query;
+  const { data: salesRaw, error: salesError } = await query;
+
+  if (salesError) {
+    return (
+      <div className="rounded-lg border border-destructive bg-destructive/5 p-5">
+        <p className="font-medium text-destructive">Não foi possível carregar as vendas.</p>
+        <p className="mt-2 text-sm text-muted-foreground">{salesError.message}</p>
+      </div>
+    );
+  }
 
   type SaleRow = {
     id: string;

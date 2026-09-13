@@ -46,7 +46,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("sales")
     .select(
-      "sale_date, amount, status, installments, procedures(name, segment), payment_methods(name), sellers(name), sale_areas(procedure_areas(name)), clients(name, cpf, phone, email, cep, logradouro, numero, complemento, bairro, cidade, uf)"
+      "sale_date, amount, status, installments, procedures(name, segment), payment_methods(name), sellers!sales_seller_id_fkey(name), sale_areas(procedure_areas(name)), clients(name, cpf, phone, email, cep, logradouro, numero, complemento, bairro, cidade, uf)"
     )
     .order("sale_date", { ascending: false });
 

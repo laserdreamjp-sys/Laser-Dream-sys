@@ -15,7 +15,7 @@ export default async function DashboardPage() {
 
   const salesRes = await supabase
     .from("sales")
-    .select("amount, tipo_venda, procedures(segment), payment_methods(name, code), sellers(name)")
+    .select("amount, tipo_venda, procedures(name, segment), payment_methods(name, code), sellers!sales_seller_id_fkey(name)")
     .eq("status", "ativa")
     .gte("sale_date", isoFirstDay);
   const cashInRes = await supabase.from("cash_transactions").select("amount").eq("type", "entrada");
@@ -24,12 +24,21 @@ export default async function DashboardPage() {
   type SaleAgg = {
     amount: number;
     tipo_venda: string | null;
-    procedures: { segment: string | null } | null;
+    procedures: { name: string; segment: string | null } | null;
     payment_methods: { name: string; code: string } | null;
     sellers: { name: string } | null;
   };
 
   const sales = (salesRes.data ?? []) as unknown as SaleAgg[];
+
+  if (salesRes.error) {
+    return (
+      <div className="rounded-lg border border-destructive bg-destructive/5 p-5">
+        <p className="font-medium text-destructive">Não foi possível carregar o faturamento.</p>
+        <p className="mt-2 text-sm text-muted-foreground">{salesRes.error.message}</p>
+      </div>
+    );
+  }
   const cashIn: { amount: number }[] = cashInRes.data ?? [];
   const cashOut: { amount: number }[] = cashOutRes.data ?? [];
 
@@ -80,6 +89,24 @@ export default async function DashboardPage() {
     cur.count += 1;
     sellerAgg.set(key, cur);
   }
+  const procAgg = new Map<string, { qtd: number; total: number }>();
+  for (const s of sales) {
+    const nome = s.procedures?.name;
+    if (!nome) continue;
+    const cur = procAgg.get(nome) ?? { qtd: 0, total: 0 };
+    cur.qtd += 1;
+    cur.total += Number(s.amount);
+    procAgg.set(nome, cur);
+  }
+  const procPorQuantidade = Array.from(procAgg.entries())
+    .map(([nome, v]) => ({ nome, ...v }))
+    .sort((a, b) => b.qtd - a.qtd)
+    .slice(0, 8);
+  const procPorFaturamento = Array.from(procAgg.entries())
+    .map(([nome, v]) => ({ nome, ...v }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 8);
+
   const sellerRanking = Array.from(sellerAgg.entries())
     .map(([name, { total, count }]) => ({ name, total, count, ticket: count > 0 ? total / count : 0 }))
     .sort((a, b) => b.total - a.total);
@@ -169,6 +196,76 @@ export default async function DashboardPage() {
               {(radarCounts.cross_estetica ?? 0) + (radarCounts.cross_laser ?? 0)}
             </p>
           </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="overflow-hidden rounded-lg border border-border bg-surface">
+          <p className="border-b border-border px-4 py-3 text-sm font-medium text-foreground">
+            Procedimentos mais vendidos (quantidade)
+          </p>
+          <table className="w-full text-sm">
+            <thead className="bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="px-4 py-2">#</th>
+                <th className="px-4 py-2">Procedimento</th>
+                <th className="px-4 py-2 text-right">Vendas</th>
+                <th className="px-4 py-2 text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {procPorQuantidade.map((p, i) => (
+                <tr key={p.nome} className="border-t border-border">
+                  <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
+                  <td className="px-4 py-2">{p.nome}</td>
+                  <td className="px-4 py-2 text-right font-medium">{p.qtd}</td>
+                  <td className="px-4 py-2 text-right text-muted-foreground">{formatCurrency(p.total)}</td>
+                </tr>
+              ))}
+              {procPorQuantidade.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
+                    Sem vendas no período.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="overflow-hidden rounded-lg border border-border bg-surface">
+          <p className="border-b border-border px-4 py-3 text-sm font-medium text-foreground">
+            Procedimentos por faturamento
+          </p>
+          <table className="w-full text-sm">
+            <thead className="bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="px-4 py-2">#</th>
+                <th className="px-4 py-2">Procedimento</th>
+                <th className="px-4 py-2 text-right">Total</th>
+                <th className="px-4 py-2 text-right">Vendas</th>
+              </tr>
+            </thead>
+            <tbody>
+              {procPorFaturamento.map((p, i) => (
+                <tr key={p.nome} className="border-t border-border">
+                  <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
+                  <td className="px-4 py-2">{p.nome}</td>
+                  <td className="px-4 py-2 text-right font-medium text-gold-700 dark:text-gold-400">
+                    {formatCurrency(p.total)}
+                  </td>
+                  <td className="px-4 py-2 text-right text-muted-foreground">{p.qtd}</td>
+                </tr>
+              ))}
+              {procPorFaturamento.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
+                    Sem vendas no período.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 

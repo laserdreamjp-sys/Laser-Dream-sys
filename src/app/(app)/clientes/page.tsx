@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { NewClientForm } from "@/components/new-client-form";
 import { formatCpf } from "@/lib/cpf";
+import { unwrap } from "@/lib/unwrap";
 
 export default async function ClientesPage() {
   const supabase = createClient();
@@ -18,10 +19,20 @@ export default async function ClientesPage() {
 
   const profile = profileRaw as { organization_id: string } | null;
 
-  const { data: clients } = await supabase
+  const clientsRes = await supabase
     .from("clients")
     .select("id, name, cpf, phone, email, birth_date, created_at")
     .order("name");
+
+  const clients = unwrap(clientsRes, "a lista de clientes") as {
+    id: string;
+    name: string;
+    cpf: string | null;
+    phone: string | null;
+    email: string | null;
+    birth_date: string | null;
+    created_at: string;
+  }[];
 
   function formatBirthDate(value: string | null) {
     if (!value) return "-";
@@ -47,7 +58,7 @@ export default async function ClientesPage() {
             </tr>
           </thead>
           <tbody>
-            {(clients ?? []).map((client) => (
+            {clients.map((client) => (
               <tr key={client.id} className="border-t border-border">
                 <td className="px-4 py-3">
                   <Link href={`/clientes/${client.id}`} className="text-gold-700 hover:underline dark:text-gold-400">
@@ -60,7 +71,7 @@ export default async function ClientesPage() {
                 <td className="px-4 py-3">{formatBirthDate(client.birth_date)}</td>
               </tr>
             ))}
-            {(clients ?? []).length === 0 && (
+            {clients.length === 0 && (
               <tr>
                 <td colSpan={4} className="px-4 py-8 text-center text-muted-foreground">
                   Nenhum cliente cadastrado ainda.

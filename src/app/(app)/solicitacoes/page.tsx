@@ -66,7 +66,7 @@ export default async function SolicitacoesPage() {
 
   const pendingRes = await supabase
     .from("change_requests")
-    .select("id, table_name, record_id, record_label, action, payload, requested_at, profiles(full_name)")
+    .select("id, table_name, record_id, record_label, action, payload, requested_at, profiles!change_requests_requested_by_fkey(full_name)")
     .eq("status", "pendente")
     .order("requested_at", { ascending: true });
 

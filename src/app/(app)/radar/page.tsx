@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
+import { unwrap } from "@/lib/unwrap";
 import { RadarClientCard, type RadarClient } from "@/components/radar-client-card";
 import { RadarFilters } from "@/components/radar-filters";
 
@@ -63,12 +64,12 @@ export default async function RadarPage({
   const units = unitsRes.data ?? [];
   const unidadeFiltro = searchParams.unidade || null;
 
-  const { data } = await supabase
+  const radarRes = await supabase
     .from("client_intelligence")
     .select("client_id, name, phone, dias_desde_ultima, valor_total, total_compras, bucket, tier, unit_id")
     .order("valor_total", { ascending: false });
 
-  let clients = (data ?? []) as unknown as RadarClient[];
+  let clients = unwrap(radarRes, "o radar de clientes") as unknown as RadarClient[];
 
   const valorMin = searchParams.valorMin ? Number(searchParams.valorMin) : null;
   const valorMax = searchParams.valorMax ? Number(searchParams.valorMax) : null;
