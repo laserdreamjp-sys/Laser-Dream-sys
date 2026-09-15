@@ -260,6 +260,30 @@ function FullEditModal({
   const [areaIds, setAreaIds] = useState<string[]>(currentAreaIds);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
+  const [senhaExclusao, setSenhaExclusao] = useState("");
+  const [excluindo, setExcluindo] = useState(false);
+  const [erroExclusao, setErroExclusao] = useState<string | null>(null);
+
+  const hoje = new Date();
+  const dataVenda = new Date(currentSaleDate + "T00:00:00");
+  const mesmoMes =
+    dataVenda.getFullYear() === hoje.getFullYear() && dataVenda.getMonth() === hoje.getMonth();
+
+  async function handleExcluirPermanente() {
+    setExcluindo(true);
+    setErroExclusao(null);
+    const { error: rpcError } = await supabase.rpc("permanent_delete_sale", {
+      p_sale_id: saleId,
+      p_senha: senhaExclusao,
+    });
+    setExcluindo(false);
+    if (rpcError) {
+      setErroExclusao(rpcError.message);
+      return;
+    }
+    onSaved();
+  }
 
   useEffect(() => {
     function onClickFora(e: MouseEvent) {
@@ -522,6 +546,58 @@ function FullEditModal({
         </label>
 
         {error && <p className="text-xs text-destructive">{error}</p>}
+
+        <div className="rounded-md border border-dashed border-destructive/40 p-3">
+          {!mesmoMes ? (
+            <p className="text-xs text-muted-foreground">
+              Essa venda é de {dataVenda.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}, mês já
+              fechado — só pode ser cancelada (fica no histórico), não excluída de vez.
+            </p>
+          ) : !confirmandoExclusao ? (
+            <button
+              type="button"
+              onClick={() => setConfirmandoExclusao(true)}
+              className="text-xs font-medium text-destructive underline"
+            >
+              Excluir permanentemente (some do sistema, sem volta)
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <p className="text-xs font-medium text-destructive">
+                Isso apaga a venda de vez, sem passar por cancelada. Digite a senha padrão pra confirmar.
+              </p>
+              <input
+                type="password"
+                value={senhaExclusao}
+                onChange={(e) => setSenhaExclusao(e.target.value)}
+                placeholder="Senha padrão"
+                className="w-full rounded-md border border-destructive/40 bg-background px-3 py-2 text-sm"
+              />
+              {erroExclusao && <p className="text-xs text-destructive">{erroExclusao}</p>}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setConfirmandoExclusao(false);
+                    setSenhaExclusao("");
+                    setErroExclusao(null);
+                  }}
+                  className="rounded-md border border-border px-2 py-1 text-xs text-foreground hover:bg-muted"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExcluirPermanente}
+                  disabled={excluindo || !senhaExclusao}
+                  className="rounded-md bg-destructive px-2 py-1 text-xs font-medium text-white disabled:opacity-50"
+                >
+                  {excluindo ? "Excluindo..." : "Confirmar exclusão permanente"}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         <div className="flex justify-end gap-2 pt-1">
           <button

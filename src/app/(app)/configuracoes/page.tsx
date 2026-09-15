@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
 import { ManageableList } from "@/components/manageable-list";
 import { SettingsForm } from "@/components/settings-form";
+import { DeletePasswordForm } from "@/components/delete-password-form";
 import { BackupPanel } from "@/components/backup-panel";
 
 export default async function ConfiguracoesPage() {
@@ -55,6 +56,13 @@ export default async function ConfiguracoesPage() {
             Define as janelas que classificam os clientes no Radar e os limites de alerta do Dashboard.
           </p>
           <SettingsForm settings={settingsRes.data as never} canEdit={isAdmin} />
+          <div className="mt-4">
+            <DeletePasswordForm
+              organizationId={(settingsRes.data as { organization_id: string }).organization_id}
+              currentSenha={(settingsRes.data as { senha_exclusao_permanente: string }).senha_exclusao_permanente}
+              canEdit={isAdmin}
+            />
+          </div>
         </section>
       )}
 
