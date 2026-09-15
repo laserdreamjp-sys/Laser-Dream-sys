@@ -51,9 +51,7 @@ export async function GET(request: NextRequest) {
       : { data: [] as Note[] };
   const notes = (notesRes.data ?? []) as Note[];
   const ultimaNotaPorOpp = new Map<string, string>();
-  const qtdNotasPorOpp = new Map<string, number>();
   for (const n of notes) {
-    qtdNotasPorOpp.set(n.opportunity_id, (qtdNotasPorOpp.get(n.opportunity_id) ?? 0) + 1);
     const atual = ultimaNotaPorOpp.get(n.opportunity_id);
     if (!atual || n.created_at > atual) ultimaNotaPorOpp.set(n.opportunity_id, n.created_at);
   }
@@ -78,15 +76,6 @@ export async function GET(request: NextRequest) {
     criadas.push({ opportunity_id: opportunityId, regra });
   }
 
-  // ===== regra 1: primeiro contato sem retorno ha mais de 1 dia (nenhuma nota ainda) =====
-  for (const o of oppsAbertas) {
-    const temNota = qtdNotasPorOpp.has(o.id);
-    if (temNota) continue;
-    if (diffDias(o.created_at, agora) < 1) continue;
-    if (temTarefaAberta(o.id, "primeiro_contato")) continue;
-    await criarTarefa(o.id, "Fazer o primeiro contato — está há mais de 1 dia sem nenhum retorno", agora.toISOString().slice(0, 10), "primeiro_contato");
-  }
-
   // ===== regra 2: confirmacao de avaliacao marcada para amanha =====
   const amanha = new Date(agora);
   amanha.setDate(amanha.getDate() + 1);
@@ -99,8 +88,26 @@ export async function GET(request: NextRequest) {
     await criarTarefa(o.id, "Confirmar avaliação marcada para amanhã", agora.toISOString().slice(0, 10), "confirmar_avaliacao");
   }
 
-  // ===== regra 3: primeiro follow-up da sequencia (o resto anda sozinho via gatilho,
-  // so quando o usuario confirma cada etapa marcando a tarefa como feita) =====
+  // ===== sequencia de follow-up: comeca 1 dia depois de ENTRAR na etapa "Em contato"
+  // (nao de quando o lead foi criado), e dali o gatilho do banco cuida do resto
+  // (2 em 2 dias, so avanca quando o usuario confirma; no 5 sem resposta, move para Nutricao) =====
+  // busco os nomes das etapas numa consulta separada (a consulta principal so trouxe id/is_won/is_lost)
+  const stageNamesRes = await supabase.from("pipeline_stages").select("id, name").eq("organization_id", ORGANIZATION_ID);
+  const nomePorStage = new Map(((stageNamesRes.data ?? []) as { id: string; name: string }[]).map((s) => [s.id, s.name]));
+
+  const eventsRes =
+    oppIds.length > 0
+      ? await supabase
+          .from("opportunity_events")
+          .select("opportunity_id, to_stage_id, created_at")
+          .in("opportunity_id", oppIds)
+          .order("created_at", { ascending: false })
+      : { data: [] as { opportunity_id: string; to_stage_id: string; created_at: string }[] };
+  const entradaNaEtapaAtual = new Map<string, string>();
+  for (const e of (eventsRes.data ?? []) as { opportunity_id: string; to_stage_id: string; created_at: string }[]) {
+    if (!entradaNaEtapaAtual.has(e.opportunity_id)) entradaNaEtapaAtual.set(e.opportunity_id, e.created_at);
+  }
+
   const followupTagsRes = await supabase
     .from("tags")
     .select("id, name")
@@ -119,12 +126,10 @@ export async function GET(request: NextRequest) {
   );
 
   for (const o of oppsAbertas) {
-    const ultimaNota = ultimaNotaPorOpp.get(o.id);
-    if (!ultimaNota) continue; // regra 1 cuida de quem nunca teve contato
-    const temAvaliacaoFutura = o.data_avaliacao && new Date(o.data_avaliacao) > agora;
-    if (temAvaliacaoFutura) continue;
+    if (nomePorStage.get(o.stage_id) !== "Em contato") continue;
     if (oppsComFollowupTag.has(o.id)) continue; // sequencia ja comecou, o gatilho cuida do resto
-    if (diffDias(ultimaNota, agora) < 2) continue;
+    const entrou = entradaNaEtapaAtual.get(o.id) ?? o.created_at;
+    if (diffDias(entrou, agora) < 1) continue;
     if (temTarefaAberta(o.id, "followup_confirmar_1")) continue;
     await criarTarefa(
       o.id,
