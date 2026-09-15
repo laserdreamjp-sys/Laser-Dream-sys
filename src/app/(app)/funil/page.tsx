@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
 import { FunilBoard } from "@/components/funil-board";
 import { NewOpportunityButton } from "@/components/new-opportunity-button";
+import { FunilUserFilter } from "@/components/funil-user-filter";
 
 export default async function FunilPage({
   searchParams,
@@ -134,23 +135,11 @@ export default async function FunilPage({
         </div>
 
         {podeVerTodos && (
-          <form className="flex items-center gap-2">
-            <input type="hidden" name="funil" value={selectedFunnelId} />
-            <label className="text-xs text-muted-foreground">Ver leads de:</label>
-            <select
-              name="usuario"
-              defaultValue={searchParams.usuario ?? ""}
-              className="rounded-md border border-border bg-background px-2 py-1 text-xs"
-              onChange={(e) => e.currentTarget.form?.submit()}
-            >
-              <option value="">Todo mundo</option>
-              {(usuariosRes.data ?? []).map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.full_name}
-                </option>
-              ))}
-            </select>
-          </form>
+          <FunilUserFilter
+            funnelId={selectedFunnelId}
+            currentUsuario={searchParams.usuario ?? ""}
+            usuarios={usuariosRes.data ?? []}
+          />
         )}
       </div>
 
