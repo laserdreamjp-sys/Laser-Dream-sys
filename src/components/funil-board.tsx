@@ -85,12 +85,14 @@ export function FunilBoard({
   lossReasons,
   notesByOpportunity,
   currentUserId,
+  organizationId,
 }: {
   stages: Stage[];
   opportunities: Opportunity[];
   lossReasons: LossReason[];
   notesByOpportunity: Record<string, Note[]>;
   currentUserId: string;
+  organizationId: string;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -186,10 +188,14 @@ export function FunilBoard({
     if (!content) return;
     const { data, error } = await supabase
       .from("opportunity_notes")
-      .insert({ opportunity_id: opportunityId, author_id: currentUserId, content })
+      .insert({ organization_id: organizationId, opportunity_id: opportunityId, author_id: currentUserId, content })
       .select("id, content, created_at, author_id")
       .single();
-    if (!error && data) {
+    if (error) {
+      alert(`Não foi possível salvar a anotação: ${error.message}`);
+      return;
+    }
+    if (data) {
       setNotes((prev) => ({
         ...prev,
         [opportunityId]: [...(prev[opportunityId] ?? []), data as Note],

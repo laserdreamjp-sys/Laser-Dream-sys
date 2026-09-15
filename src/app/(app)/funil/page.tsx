@@ -154,6 +154,7 @@ export default async function FunilPage({
           lossReasons={lossReasonsRes.data ?? []}
           notesByOpportunity={notesByOpportunity}
           currentUserId={userId}
+          organizationId={organizationId}
         />
       )}
     </div>
