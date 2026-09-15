@@ -8,24 +8,6 @@ function formatDateTime(value: string) {
 }
 
 export default async function SolicitacoesPage() {
-  try {
-    return await SolicitacoesContent();
-  } catch (err) {
-    const mensagem = err instanceof Error ? err.message : String(err);
-    const stack = err instanceof Error ? err.stack : "";
-    return (
-      <div className="rounded-lg border border-destructive bg-destructive/5 p-5">
-        <p className="font-medium text-destructive">Erro real capturado (diagnóstico temporário):</p>
-        <pre className="mt-2 whitespace-pre-wrap text-xs text-destructive">{mensagem}</pre>
-        <pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap text-[10px] text-muted-foreground">
-          {stack}
-        </pre>
-      </div>
-    );
-  }
-}
-
-async function SolicitacoesContent() {
   const supabase = createClient();
   const { userId, isAdmin } = await getCurrentProfile();
 
