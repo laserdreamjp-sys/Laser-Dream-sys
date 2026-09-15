@@ -16,9 +16,23 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { createClient } from "@/lib/supabase/client";
+import { LeadDetailModal } from "@/components/lead-detail-modal";
 
 type Stage = { id: string; name: string; position: number; is_won: boolean; is_lost: boolean };
 type Note = { id: string; content: string; created_at: string; author_id: string | null; author_name?: string };
+type Tag = { id: string; name: string; color: string };
+type Task = {
+  id: string;
+  title: string;
+  due_date: string | null;
+  done: boolean;
+  assigned_to: string | null;
+  assigned_name?: string;
+};
+type Origin = { id: string; name: string };
+type Procedure = { id: string; name: string; segment: string | null };
+type Area = { id: string; name: string; group_label: string | null; procedure_id: string | null; segment: string | null };
+type Seller = { id: string; name: string };
 type Opportunity = {
   id: string;
   client_id: string;
@@ -28,6 +42,9 @@ type Opportunity = {
   notes: string | null;
   sale_id: string | null;
   loss_reason_id: string | null;
+  lead_origin_id: string | null;
+  referred_by_name: string | null;
+  interesse_procedure_id: string | null;
   clients: { name: string } | null;
   sellers: { name: string } | null;
 };
@@ -38,11 +55,17 @@ function formatCurrency(value: number | null) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-}
-
-function DraggableCard({ opportunity, children }: { opportunity: Opportunity; children: React.ReactNode }) {
+function DraggableCard({
+  opportunity,
+  children,
+  onOpen,
+  justDragged,
+}: {
+  opportunity: Opportunity;
+  children: React.ReactNode;
+  onOpen: () => void;
+  justDragged: boolean;
+}) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: opportunity.id,
   });
@@ -56,6 +79,9 @@ function DraggableCard({ opportunity, children }: { opportunity: Opportunity; ch
       style={style}
       {...listeners}
       {...attributes}
+      onClick={() => {
+        if (!isDragging && !justDragged) onOpen();
+      }}
       className={`touch-none rounded-md border border-border bg-background p-3 text-sm shadow-soft ${
         isDragging ? "opacity-50" : "cursor-grab active:cursor-grabbing"
       }`}
@@ -84,28 +110,41 @@ export function FunilBoard({
   opportunities,
   lossReasons,
   notesByOpportunity,
+  tagsByOpportunity,
+  tasksByOpportunity,
+  interestAreasByOpportunity,
   currentUserId,
   organizationId,
+  allTags,
+  origins,
+  procedures,
+  areas,
+  sellers,
 }: {
   stages: Stage[];
   opportunities: Opportunity[];
   lossReasons: LossReason[];
   notesByOpportunity: Record<string, Note[]>;
+  tagsByOpportunity: Record<string, Tag[]>;
+  tasksByOpportunity: Record<string, Task[]>;
+  interestAreasByOpportunity: Record<string, string[]>;
   currentUserId: string;
   organizationId: string;
+  allTags: Tag[];
+  origins: Origin[];
+  procedures: Procedure[];
+  areas: Area[];
+  sellers: Seller[];
 }) {
   const supabase = createClient();
   const router = useRouter();
   const [items, setItems] = useState(opportunities);
-  const [notes, setNotes] = useState(notesByOpportunity);
-  const [lossModal, setLossModal] = useState<{ opportunityId: string; targetStageId: string } | null>(
-    null
-  );
+  const [lossModal, setLossModal] = useState<{ opportunityId: string; targetStageId: string } | null>(null);
   const [selectedReason, setSelectedReason] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [newNote, setNewNote] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [justDraggedId, setJustDraggedId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -148,9 +187,7 @@ export function FunilBoard({
       });
       setItems((prev) =>
         prev.map((o) =>
-          o.id === opportunityId
-            ? { ...o, stage_id: targetStageId, loss_reason_id: lossReasonId ?? null }
-            : o
+          o.id === opportunityId ? { ...o, stage_id: targetStageId, loss_reason_id: lossReasonId ?? null } : o
         )
       );
     }
@@ -164,8 +201,10 @@ export function FunilBoard({
   function handleDragEnd(event: DragEndEvent) {
     setActiveId(null);
     const { active, over } = event;
-    if (!over) return;
     const opportunityId = String(active.id);
+    setJustDraggedId(opportunityId);
+    setTimeout(() => setJustDraggedId((cur) => (cur === opportunityId ? null : cur)), 300);
+    if (!over) return;
     const targetStageId = String(over.id);
     const stage = stages.find((s) => s.id === targetStageId);
     if (!stage) return;
@@ -183,29 +222,9 @@ export function FunilBoard({
     setLossModal(null);
   }
 
-  async function addNote(opportunityId: string) {
-    const content = newNote.trim();
-    if (!content) return;
-    const { data, error } = await supabase
-      .from("opportunity_notes")
-      .insert({ organization_id: organizationId, opportunity_id: opportunityId, author_id: currentUserId, content })
-      .select("id, content, created_at, author_id")
-      .single();
-    if (error) {
-      alert(`Não foi possível salvar a anotação: ${error.message}`);
-      return;
-    }
-    if (data) {
-      setNotes((prev) => ({
-        ...prev,
-        [opportunityId]: [...(prev[opportunityId] ?? []), data as Note],
-      }));
-      setNewNote("");
-      router.refresh();
-    }
-  }
-
   const activeOpportunity = activeId ? items.find((o) => o.id === activeId) : null;
+  const openOpportunity = openId ? items.find((o) => o.id === openId) : null;
+  const hoje = new Date().toISOString().slice(0, 10);
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
@@ -225,15 +244,47 @@ export function FunilBoard({
                 </div>
                 <div className="space-y-2 p-2">
                   {stageOpps.map((o) => {
-                    const opportunityNotes = notes[o.id] ?? [];
-                    const isExpanded = expandedId === o.id;
+                    const opportunityNotes = notesByOpportunity[o.id] ?? [];
+                    const opportunityTags = tagsByOpportunity[o.id] ?? [];
+                    const opportunityTasks = tasksByOpportunity[o.id] ?? [];
+                    const tarefasAtrasadas = opportunityTasks.filter((t) => !t.done && t.due_date && t.due_date < hoje);
+                    const tarefasAbertas = opportunityTasks.filter((t) => !t.done);
+
                     return (
-                      <DraggableCard key={o.id} opportunity={o}>
+                      <DraggableCard
+                        key={o.id}
+                        opportunity={o}
+                        onOpen={() => setOpenId(o.id)}
+                        justDragged={justDraggedId === o.id}
+                      >
                         <p className="font-medium text-foreground">{o.clients?.name ?? "Cliente"}</p>
                         <p className="text-xs text-muted-foreground">
                           {o.sellers?.name ?? "sem vendedora"} · {formatCurrency(o.estimated_value)}
                         </p>
-                        {o.notes && <p className="mt-1 text-xs text-muted-foreground">{o.notes}</p>}
+
+                        {opportunityTags.length > 0 && (
+                          <div className="mt-1.5 flex flex-wrap gap-1">
+                            {opportunityTags.map((t) => (
+                              <span
+                                key={t.id}
+                                className="rounded-full px-1.5 py-0.5 text-[10px] text-white"
+                                style={{ backgroundColor: t.color }}
+                              >
+                                {t.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
+                        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+                          {opportunityNotes.length > 0 && <span>📝 {opportunityNotes.length}</span>}
+                          {tarefasAbertas.length > 0 && (
+                            <span className={tarefasAtrasadas.length > 0 ? "font-medium text-destructive" : ""}>
+                              ☐ {tarefasAbertas.length}
+                              {tarefasAtrasadas.length > 0 ? " atrasada" : ""}
+                            </span>
+                          )}
+                        </div>
 
                         {stage.is_won && !o.sale_id && (
                           <Link
@@ -241,6 +292,7 @@ export function FunilBoard({
                               o.seller_id ? `&sellerId=${o.seller_id}` : ""
                             }`}
                             onPointerDown={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
                             className="mt-2 block rounded-md bg-gold-500 px-2 py-1 text-center text-xs font-medium text-white hover:bg-gold-600"
                           >
                             Registrar venda
@@ -255,57 +307,6 @@ export function FunilBoard({
                           <p className="mt-2 text-xs text-destructive">
                             Motivo: {lossReasons.find((r) => r.id === o.loss_reason_id)?.name ?? "-"}
                           </p>
-                        )}
-
-                        <button
-                          type="button"
-                          onPointerDown={(e) => e.stopPropagation()}
-                          onClick={() => setExpandedId(isExpanded ? null : o.id)}
-                          className="mt-2 text-xs text-gold-700 underline dark:text-gold-400"
-                        >
-                          {isExpanded ? "Fechar anotações" : `Anotações (${opportunityNotes.length})`}
-                        </button>
-
-                        {isExpanded && (
-                          <div
-                            onPointerDown={(e) => e.stopPropagation()}
-                            className="mt-2 space-y-2 border-t border-border pt-2"
-                          >
-                            <div className="max-h-32 space-y-1.5 overflow-y-auto">
-                              {opportunityNotes.length === 0 && (
-                                <p className="text-xs text-muted-foreground">Sem anotações ainda.</p>
-                              )}
-                              {opportunityNotes.map((n) => (
-                                <div key={n.id} className="rounded bg-muted p-1.5 text-xs">
-                                  <p className="text-foreground">{n.content}</p>
-                                  <p className="mt-0.5 text-[10px] text-muted-foreground">
-                                    {n.author_name ?? "alguém"} · {formatDateTime(n.created_at)}
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-                            <div className="flex gap-1.5">
-                              <input
-                                value={expandedId === o.id ? newNote : ""}
-                                onChange={(e) => setNewNote(e.target.value)}
-                                placeholder="Nova anotação..."
-                                className="w-full rounded-md border border-border bg-background px-2 py-1 text-xs"
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    addNote(o.id);
-                                  }
-                                }}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => addNote(o.id)}
-                                className="shrink-0 rounded-md bg-gold-500 px-2 py-1 text-xs font-medium text-white hover:bg-gold-600"
-                              >
-                                Salvar
-                              </button>
-                            </div>
-                          </div>
                         )}
                       </DraggableCard>
                     );
@@ -364,6 +365,28 @@ export function FunilBoard({
             </div>
           </div>
         </div>
+      )}
+
+      {openOpportunity && (
+        <LeadDetailModal
+          opportunityId={openOpportunity.id}
+          clientName={openOpportunity.clients?.name ?? "Cliente"}
+          leadOriginId={openOpportunity.lead_origin_id}
+          referredByName={openOpportunity.referred_by_name}
+          interesseProcedureId={openOpportunity.interesse_procedure_id}
+          notes={notesByOpportunity[openOpportunity.id] ?? []}
+          tags={tagsByOpportunity[openOpportunity.id] ?? []}
+          tasks={tasksByOpportunity[openOpportunity.id] ?? []}
+          interestAreaIds={interestAreasByOpportunity[openOpportunity.id] ?? []}
+          allTags={allTags}
+          origins={origins}
+          procedures={procedures}
+          areas={areas}
+          sellers={sellers}
+          organizationId={organizationId}
+          currentUserId={currentUserId}
+          onClose={() => setOpenId(null)}
+        />
       )}
     </DndContext>
   );
