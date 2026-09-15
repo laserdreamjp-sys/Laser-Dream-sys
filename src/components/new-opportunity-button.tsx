@@ -35,6 +35,7 @@ export function NewOpportunityButton({
   const [mostrarResultados, setMostrarResultados] = useState(false);
   const [clienteSelecionado, setClienteSelecionado] = useState<ClientMatch | null>(null);
   const [parecidos, setParecidos] = useState<ClientMatch[]>([]);
+  const [confirmadoCriarNovo, setConfirmadoCriarNovo] = useState(false);
 
   const [sellerId, setSellerId] = useState("");
   const [unitId, setUnitId] = useState(units[0]?.id ?? "");
@@ -53,6 +54,7 @@ export function NewOpportunityButton({
     if (clienteSelecionado) return;
     const termo = busca.trim();
     setParecidos([]);
+    setConfirmadoCriarNovo(false);
     if (termo.length < 2) {
       setResultados([]);
       return;
@@ -103,10 +105,13 @@ export function NewOpportunityButton({
         return;
       }
       // antes de criar cliente novo, confere se ja existe alguem parecido
-      const qtdParecidos = await verificarParecidos(nome);
-      if (qtdParecidos > 0 && parecidos.length === 0) {
-        // primeira tentativa: so mostra o aviso, nao cria ainda
-        return;
+      // (so pula essa checagem se o usuario ja confirmou explicitamente que quer criar mesmo assim)
+      if (!confirmadoCriarNovo) {
+        const qtdParecidos = await verificarParecidos(nome);
+        if (qtdParecidos > 0) {
+          // mostra o aviso e espera o usuario decidir; nao cria nada ainda
+          return;
+        }
       }
       setSaving(true);
       const { data: novoCliente, error: clientError } = await supabase
@@ -145,6 +150,7 @@ export function NewOpportunityButton({
     setEstimatedValue("");
     setNotes("");
     setParecidos([]);
+    setConfirmadoCriarNovo(false);
     router.refresh();
   }
 
@@ -229,7 +235,10 @@ export function NewOpportunityButton({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setParecidos([])}
+                  onClick={() => {
+                    setParecidos([]);
+                    setConfirmadoCriarNovo(true);
+                  }}
                   className="mt-2 text-xs text-amber-800 underline dark:text-amber-300"
                 >
                   Não, é pessoa diferente — criar cliente novo mesmo assim
@@ -299,6 +308,7 @@ export function NewOpportunityButton({
                   setOpen(false);
                   limparSelecao();
                   setParecidos([]);
+                  setConfirmadoCriarNovo(false);
                 }}
                 className="rounded-md border border-border px-3 py-1.5 text-sm text-foreground hover:bg-muted"
               >
