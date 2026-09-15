@@ -88,7 +88,7 @@ export async function GET(request: NextRequest) {
     await criarTarefa(o.id, "Confirmar avaliação marcada para amanhã", agora.toISOString().slice(0, 10), "confirmar_avaliacao");
   }
 
-  // ===== sequencia de follow-up: comeca 1 dia depois de ENTRAR na etapa "Em contato"
+  // ===== sequencia de follow-up: comeca 1 dia depois de ENTRAR na etapa "Tentativa de contato"
   // (nao de quando o lead foi criado), e dali o gatilho do banco cuida do resto
   // (2 em 2 dias, so avanca quando o usuario confirma; no 5 sem resposta, move para Nutricao) =====
   // busco os nomes das etapas numa consulta separada (a consulta principal so trouxe id/is_won/is_lost)
@@ -126,7 +126,7 @@ export async function GET(request: NextRequest) {
   );
 
   for (const o of oppsAbertas) {
-    if (nomePorStage.get(o.stage_id) !== "Em contato") continue;
+    if (nomePorStage.get(o.stage_id) !== "Tentativa de contato") continue;
     if (oppsComFollowupTag.has(o.id)) continue; // sequencia ja comecou, o gatilho cuida do resto
     const entrou = entradaNaEtapaAtual.get(o.id) ?? o.created_at;
     if (diffDias(entrou, agora) < 1) continue;

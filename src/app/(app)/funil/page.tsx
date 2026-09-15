@@ -16,6 +16,8 @@ export default async function FunilPage({
     origem?: string;
     vendedor?: string;
     atrasadas?: string;
+    status?: string;
+    motivo?: string;
   };
 }) {
   const supabase = createClient();
@@ -86,6 +88,25 @@ export default async function FunilPage({
   }
   if (origensFiltro.length > 0) opportunitiesQuery = opportunitiesQuery.in("lead_origin_id", origensFiltro);
   if (vendedoresFiltro.length > 0) opportunitiesQuery = opportunitiesQuery.in("seller_id", vendedoresFiltro);
+
+  const statusFiltro = (searchParams.status ?? "").split(",").filter(Boolean);
+  if (statusFiltro.length > 0) {
+    const stageIdsPorStatus = stages
+      .filter((s) => {
+        if (statusFiltro.includes("ganho") && s.is_won) return true;
+        if (statusFiltro.includes("perdido") && s.is_lost) return true;
+        if (statusFiltro.includes("andamento") && !s.is_won && !s.is_lost) return true;
+        return false;
+      })
+      .map((s) => s.id);
+    opportunitiesQuery = opportunitiesQuery.in(
+      "stage_id",
+      stageIdsPorStatus.length > 0 ? stageIdsPorStatus : ["00000000-0000-0000-0000-000000000000"]
+    );
+  }
+
+  const motivosFiltro = (searchParams.motivo ?? "").split(",").filter(Boolean);
+  if (motivosFiltro.length > 0) opportunitiesQuery = opportunitiesQuery.in("loss_reason_id", motivosFiltro);
   if (idsPermitidosFinal !== null) {
     opportunitiesQuery = opportunitiesQuery.in(
       "id",
@@ -206,6 +227,8 @@ export default async function FunilPage({
   delete baseParams.origem;
   delete baseParams.vendedor;
   delete baseParams.atrasadas;
+  delete baseParams.status;
+  delete baseParams.motivo;
 
   return (
     <div className="space-y-6">
@@ -287,6 +310,26 @@ export default async function FunilPage({
             currentParams={{ ...currentParams, funil: selectedFunnelId }}
           />
         </div>
+        <div className="w-40">
+          <ColumnFilter
+            label="Status"
+            paramName="status"
+            options={[
+              { value: "andamento", label: "Em andamento" },
+              { value: "ganho", label: "Vendido" },
+              { value: "perdido", label: "Perdido" },
+            ]}
+            currentParams={{ ...currentParams, funil: selectedFunnelId }}
+          />
+        </div>
+        <div className="w-40">
+          <ColumnFilter
+            label="Motivo da perda"
+            paramName="motivo"
+            options={(lossReasonsRes.data ?? []).map((r) => ({ value: r.id, label: r.name }))}
+            currentParams={{ ...currentParams, funil: selectedFunnelId }}
+          />
+        </div>
         <Link
           href={`/funil?${new URLSearchParams({ ...baseParams, funil: selectedFunnelId, atrasadas: soAtrasadas ? "" : "1" }).toString()}`}
           className={`rounded-md border px-2 py-1.5 text-xs ${
@@ -297,7 +340,12 @@ export default async function FunilPage({
         >
           Com tarefa atrasada
         </Link>
-        {(etiquetasFiltro.length > 0 || origensFiltro.length > 0 || vendedoresFiltro.length > 0 || soAtrasadas) && (
+        {(etiquetasFiltro.length > 0 ||
+          origensFiltro.length > 0 ||
+          vendedoresFiltro.length > 0 ||
+          statusFiltro.length > 0 ||
+          motivosFiltro.length > 0 ||
+          soAtrasadas) && (
           <Link
             href={`/funil?${new URLSearchParams({ ...baseParams, funil: selectedFunnelId }).toString()}`}
             className="text-xs text-muted-foreground underline"
