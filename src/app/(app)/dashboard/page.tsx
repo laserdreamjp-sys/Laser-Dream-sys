@@ -15,7 +15,9 @@ export default async function DashboardPage() {
 
   const salesRes = await supabase
     .from("sales")
-    .select("amount, tipo_venda, procedures(name, segment), payment_methods(name, code), sellers!sales_seller_id_fkey(name)")
+    .select(
+      "amount, tipo_venda, procedures(name, segment), payment_methods(name, code), sellers!sales_seller_id_fkey(name), co_seller:sellers!sales_co_seller_id_fkey(name), sale_areas(procedure_areas(name))"
+    )
     .eq("status", "ativa")
     .gte("sale_date", isoFirstDay);
   const cashInRes = await supabase.from("cash_transactions").select("amount").eq("type", "entrada");
@@ -27,6 +29,8 @@ export default async function DashboardPage() {
     procedures: { name: string; segment: string | null } | null;
     payment_methods: { name: string; code: string } | null;
     sellers: { name: string } | null;
+    co_seller: { name: string } | null;
+    sale_areas: { procedure_areas: { name: string } | null }[];
   };
 
   const sales = (salesRes.data ?? []) as unknown as SaleAgg[];
@@ -81,14 +85,6 @@ export default async function DashboardPage() {
   const revendaTotal = sales.filter((s) => s.tipo_venda === "REVENDA").reduce((acc, s) => acc + Number(s.amount), 0);
   const novaTotal = sales.filter((s) => s.tipo_venda === "VENDA NOVA").reduce((acc, s) => acc + Number(s.amount), 0);
 
-  const sellerAgg = new Map<string, { total: number; count: number }>();
-  for (const s of sales) {
-    const key = s.sellers?.name ?? "-";
-    const cur = sellerAgg.get(key) ?? { total: 0, count: 0 };
-    cur.total += Number(s.amount);
-    cur.count += 1;
-    sellerAgg.set(key, cur);
-  }
   const procAgg = new Map<string, { qtd: number; total: number }>();
   for (const s of sales) {
     const nome = s.procedures?.name;
@@ -106,6 +102,39 @@ export default async function DashboardPage() {
     .map(([nome, v]) => ({ nome, ...v }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 8);
+
+  const areaAgg = new Map<string, { qtd: number; total: number }>();
+  for (const s of sales) {
+    const nomesDaVenda = new Set(s.sale_areas.map((sa) => sa.procedure_areas?.name).filter(Boolean) as string[]);
+    for (const nome of nomesDaVenda) {
+      const cur = areaAgg.get(nome) ?? { qtd: 0, total: 0 };
+      cur.qtd += 1;
+      cur.total += Number(s.amount);
+      areaAgg.set(nome, cur);
+    }
+  }
+  const areaPorQuantidade = Array.from(areaAgg.entries())
+    .map(([nome, v]) => ({ nome, ...v }))
+    .sort((a, b) => b.qtd - a.qtd)
+    .slice(0, 8);
+
+  // dupla e definitiva no ranking: quando a venda tem parceira registrada,
+  // as duas aparecem somadas como uma unidade so, nunca duplicada nem dividida.
+  // A "opcao de separar" e o proprio checkbox de dupla no lancamento da venda:
+  // se ele ficou desmarcado naquela venda, ela conta sozinha aqui.
+  function chaveDupla(titular: string, parceira: string | null): string {
+    if (!parceira) return titular;
+    return [titular, parceira].sort().join(" + ");
+  }
+
+  const sellerAgg = new Map<string, { total: number; count: number }>();
+  for (const s of sales) {
+    const key = s.sellers?.name ? chaveDupla(s.sellers.name, s.co_seller?.name ?? null) : "-";
+    const cur = sellerAgg.get(key) ?? { total: 0, count: 0 };
+    cur.total += Number(s.amount);
+    cur.count += 1;
+    sellerAgg.set(key, cur);
+  }
 
   const sellerRanking = Array.from(sellerAgg.entries())
     .map(([name, { total, count }]) => ({ name, total, count, ticket: count > 0 ? total / count : 0 }))
@@ -269,6 +298,39 @@ export default async function DashboardPage() {
         </div>
       </div>
 
+      <div className="overflow-hidden rounded-lg border border-border bg-surface">
+        <p className="border-b border-border px-4 py-3 text-sm font-medium text-foreground">
+          Áreas mais vendidas
+        </p>
+        <table className="w-full text-sm">
+          <thead className="bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <tr>
+              <th className="px-4 py-2">#</th>
+              <th className="px-4 py-2">Área</th>
+              <th className="px-4 py-2 text-right">Vendas</th>
+              <th className="px-4 py-2 text-right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {areaPorQuantidade.map((a, i) => (
+              <tr key={a.nome} className="border-t border-border">
+                <td className="px-4 py-2 text-muted-foreground">{i + 1}</td>
+                <td className="px-4 py-2">{a.nome}</td>
+                <td className="px-4 py-2 text-right font-medium">{a.qtd}</td>
+                <td className="px-4 py-2 text-right text-muted-foreground">{formatCurrency(a.total)}</td>
+              </tr>
+            ))}
+            {areaPorQuantidade.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">
+                  Sem áreas registradas no período.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
         <p className="border-b border-border px-4 py-3 text-sm font-medium text-foreground">
           Desempenho por vendedora
@@ -276,7 +338,7 @@ export default async function DashboardPage() {
         <table className="w-full text-sm">
           <thead className="bg-muted text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
-              <th className="px-4 py-2">Vendedora</th>
+              <th className="px-4 py-2">Vendedora / Dupla</th>
               <th className="px-4 py-2 text-right">Total vendido</th>
               <th className="px-4 py-2 text-right">Nº vendas</th>
               <th className="px-4 py-2 text-right">Ticket médio</th>

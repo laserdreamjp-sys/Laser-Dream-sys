@@ -25,6 +25,7 @@ type SaleRow = {
   sale_date: string;
   amount: number;
   status: string;
+  procedure_id: string | null;
   procedures: { name: string; segment: string | null } | null;
   payment_methods: { name: string } | null;
   sellers: { name: string } | null;
@@ -74,7 +75,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   const salesRes = await supabase
     .from("sales")
     .select(
-      "id, sale_date, amount, status, procedures(name, segment), payment_methods(name), sellers!sales_seller_id_fkey(name), co_seller:sellers!sales_co_seller_id_fkey(name), sale_areas(procedure_areas(name))"
+      "id, sale_date, amount, status, procedure_id, procedures(name, segment), payment_methods(name), sellers!sales_seller_id_fkey(name), co_seller:sellers!sales_co_seller_id_fkey(name), sale_areas(procedure_areas(name))"
     )
     .eq("client_id", params.id)
     .order("sale_date", { ascending: false });
@@ -89,14 +90,30 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     .order("group_label")
     .order("name");
 
-  const procsRes = await supabase
+  const allProceduresRes = await supabase
     .from("procedures")
-    .select("name")
+    .select("id, name")
     .eq("segment", "estetica")
     .order("name");
 
+  const allProcedures = unwrap(allProceduresRes, "os procedimentos de estética") as { id: string; name: string }[];
+
+  const procAreasRes = await supabase
+    .from("procedure_areas")
+    .select("id, name, procedure_id")
+    .not("procedure_id", "is", null)
+    .order("name");
+  const procAreasAll = unwrap(procAreasRes, "as áreas por procedimento") as { id: string; name: string; procedure_id: string }[];
+  const areasPorProcedimento = new Map<string, { id: string; name: string }[]>();
+  for (const a of procAreasAll) {
+    const list = areasPorProcedimento.get(a.procedure_id) ?? [];
+    list.push({ id: a.id, name: a.name });
+    areasPorProcedimento.set(a.procedure_id, list);
+  }
+
   const areasFeitas = new Set<string>();
   const procedimentosFeitos = new Set<string>();
+  const areasEsteticaFeitasPorProcedimento = new Map<string, Set<string>>();
   for (const s of sales) {
     if (s.status !== "ativa") continue;
     for (const sa of s.sale_areas) {
@@ -104,6 +121,13 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     }
     if (s.procedures?.segment === "estetica" && s.procedures.name) {
       procedimentosFeitos.add(s.procedures.name);
+      if (s.procedure_id) {
+        const set = areasEsteticaFeitasPorProcedimento.get(s.procedure_id) ?? new Set<string>();
+        for (const sa of s.sale_areas) {
+          if (sa.procedure_areas?.name) set.add(sa.procedure_areas.name);
+        }
+        areasEsteticaFeitasPorProcedimento.set(s.procedure_id, set);
+      }
     }
   }
 
@@ -115,11 +139,15 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     areasPorGrupo.set(a.group_label, list);
   }
 
-  const allProcedures = unwrap(procsRes, "os procedimentos de estética") as { name: string }[];
-  const procedimentosComStatus = allProcedures.map((p) => ({
-    name: p.name,
-    feito: procedimentosFeitos.has(p.name),
-  }));
+  const procedimentosComStatus = allProcedures.map((p) => {
+    const areasDoProcedimento = areasPorProcedimento.get(p.id) ?? [];
+    const areasFeitasAqui = areasEsteticaFeitasPorProcedimento.get(p.id) ?? new Set<string>();
+    return {
+      name: p.name,
+      feito: procedimentosFeitos.has(p.name),
+      areas: areasDoProcedimento.map((a) => ({ name: a.name, feito: areasFeitasAqui.has(a.name) })),
+    };
+  });
 
 
   return (
@@ -210,19 +238,43 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
 
         <div className="rounded-lg border border-border bg-surface p-4">
           <p className="mb-3 text-sm font-medium text-foreground">Estética: feita x em aberto</p>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="space-y-3">
             {procedimentosComStatus.map((p) => (
-              <span
-                key={p.name}
-                className={`rounded-full px-2 py-0.5 text-xs ${
-                  p.feito
-                    ? "bg-gold-100 text-gold-800 dark:bg-gold-900/30 dark:text-gold-300"
-                    : "border border-dashed border-border text-muted-foreground"
-                }`}
-              >
-                {p.feito ? "✓ " : ""}
-                {p.name}
-              </span>
+              <div key={p.name}>
+                {p.areas.length > 0 ? (
+                  <>
+                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      {p.name}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {p.areas.map((a) => (
+                        <span
+                          key={a.name}
+                          className={`rounded-full px-2 py-0.5 text-xs ${
+                            a.feito
+                              ? "bg-gold-100 text-gold-800 dark:bg-gold-900/30 dark:text-gold-300"
+                              : "border border-dashed border-border text-muted-foreground"
+                          }`}
+                        >
+                          {a.feito ? "✓ " : ""}
+                          {a.name}
+                        </span>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs ${
+                      p.feito
+                        ? "bg-gold-100 text-gold-800 dark:bg-gold-900/30 dark:text-gold-300"
+                        : "border border-dashed border-border text-muted-foreground"
+                    }`}
+                  >
+                    {p.feito ? "✓ " : ""}
+                    {p.name}
+                  </span>
+                )}
+              </div>
             ))}
           </div>
           <p className="mt-3 text-xs text-muted-foreground">

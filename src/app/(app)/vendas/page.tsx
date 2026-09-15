@@ -119,6 +119,11 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
 
   const paymentMethods = paymentMethodsRes.data ?? [];
 
+  const totalMesAtivas = sales
+    .filter((s) => s.status === "ativa")
+    .reduce((acc, s) => acc + Number(s.amount), 0);
+  const qtdMesAtivas = sales.filter((s) => s.status === "ativa").length;
+
   const otherParams = Object.fromEntries(
     Object.entries(searchParams).filter(([k, v]) => v && k !== "mes")
   ) as Record<string, string>;
@@ -127,6 +132,14 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
 
   return (
     <div>
+      <div className="mb-4 rounded-lg border border-gold-300 bg-gold-50 p-4 shadow-soft dark:border-gold-700 dark:bg-gold-900/20">
+        <p className="text-xs text-gold-700 dark:text-gold-300">Total vendido no mês (vendas ativas)</p>
+        <p className="font-display text-3xl font-semibold text-gold-700 dark:text-gold-300">
+          {formatCurrency(totalMesAtivas)}
+        </p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{qtdMesAtivas} venda(s)</p>
+      </div>
+
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap items-center gap-3">
           <h2 className="font-display font-semibold text-2xl text-foreground">Vendas</h2>
