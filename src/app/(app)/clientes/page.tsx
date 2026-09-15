@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { NewClientForm } from "@/components/new-client-form";
+import { Pagination } from "@/components/pagination";
 import { formatCpf } from "@/lib/cpf";
 import { unwrap } from "@/lib/unwrap";
 
-export default async function ClientesPage() {
+export default async function ClientesPage({
+  searchParams,
+}: {
+  searchParams: { pagina?: string; porPagina?: string };
+}) {
   const supabase = createClient();
 
   const {
@@ -19,10 +24,18 @@ export default async function ClientesPage() {
 
   const profile = profileRaw as { organization_id: string } | null;
 
+  const pageSize = [25, 50, 100].includes(Number(searchParams.porPagina))
+    ? Number(searchParams.porPagina)
+    : 50;
+  const page = Math.max(1, Number(searchParams.pagina) || 1);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
   const clientsRes = await supabase
     .from("clients")
-    .select("id, name, cpf, phone, email, birth_date, created_at")
-    .order("name");
+    .select("id, name, cpf, phone, email, birth_date, created_at", { count: "exact" })
+    .order("name")
+    .range(from, to);
 
   const clients = unwrap(clientsRes, "a lista de clientes") as {
     id: string;
@@ -33,6 +46,7 @@ export default async function ClientesPage() {
     birth_date: string | null;
     created_at: string;
   }[];
+  const total = clientsRes.count ?? 0;
 
   function formatBirthDate(value: string | null) {
     if (!value) return "-";
@@ -80,6 +94,7 @@ export default async function ClientesPage() {
             )}
           </tbody>
         </table>
+        <Pagination page={page} pageSize={pageSize} total={total} />
       </div>
     </div>
   );

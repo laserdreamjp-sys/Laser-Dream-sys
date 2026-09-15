@@ -346,9 +346,9 @@ export function NewSaleForm({
           </select>
         </Field>
 
-        {segment === "laser" ? (
+        {areasForSelection.length > 0 && (
           <div>
-            <p className="mb-2 text-sm text-foreground">Área / região de aplicação</p>
+            <p className="mb-2 text-sm text-foreground">Área / região de aplicação (pode escolher mais de uma)</p>
             <div className="space-y-3 rounded-md border border-border bg-surface p-4">
               {groupedAreas.map(([group, groupAreas]) => (
                 <div key={group}>
@@ -379,27 +379,6 @@ export function NewSaleForm({
               ))}
             </div>
           </div>
-        ) : (
-          areasForSelection.length > 0 && (
-            <Field label="Área / região de aplicação">
-              <select
-                value={selectedAreaIds[0] ?? ""}
-                onChange={(e) => setSelectedAreaIds(e.target.value ? [e.target.value] : [])}
-                className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
-              >
-                <option value="">Nenhuma</option>
-                {groupedAreas.map(([group, groupAreas]) => (
-                  <optgroup key={group} label={group}>
-                    {groupAreas.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name}
-                      </option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </Field>
-          )
         )}
       </Section>
 

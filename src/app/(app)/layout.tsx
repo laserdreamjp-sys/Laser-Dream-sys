@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Sidebar } from "@/components/sidebar";
+import { GlobalSearch } from "@/components/global-search";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
@@ -27,7 +28,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-background md:flex">
       <Sidebar fullName={fullName} roleName={roleName} />
-      <main className="flex-1 overflow-y-auto p-4 md:p-8">{children}</main>
+      <main className="flex-1 overflow-y-auto p-4 md:p-8">
+        <div className="mb-4">
+          <GlobalSearch />
+        </div>
+        {children}
+      </main>
     </div>
   );
 }

@@ -100,14 +100,14 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
 
   const procAreasRes = await supabase
     .from("procedure_areas")
-    .select("id, name, procedure_id")
+    .select("id, name, procedure_id, group_label")
     .not("procedure_id", "is", null)
     .order("name");
-  const procAreasAll = unwrap(procAreasRes, "as áreas por procedimento") as { id: string; name: string; procedure_id: string }[];
-  const areasPorProcedimento = new Map<string, { id: string; name: string }[]>();
+  const procAreasAll = unwrap(procAreasRes, "as áreas por procedimento") as { id: string; name: string; procedure_id: string; group_label: string | null }[];
+  const areasPorProcedimento = new Map<string, { id: string; name: string; group_label: string | null }[]>();
   for (const a of procAreasAll) {
     const list = areasPorProcedimento.get(a.procedure_id) ?? [];
-    list.push({ id: a.id, name: a.name });
+    list.push({ id: a.id, name: a.name, group_label: a.group_label });
     areasPorProcedimento.set(a.procedure_id, list);
   }
 
@@ -116,8 +116,10 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   const areasEsteticaFeitasPorProcedimento = new Map<string, Set<string>>();
   for (const s of sales) {
     if (s.status !== "ativa") continue;
-    for (const sa of s.sale_areas) {
-      if (sa.procedure_areas?.name) areasFeitas.add(sa.procedure_areas.name);
+    if (s.procedures?.segment === "laser") {
+      for (const sa of s.sale_areas) {
+        if (sa.procedure_areas?.name) areasFeitas.add(sa.procedure_areas.name);
+      }
     }
     if (s.procedures?.segment === "estetica" && s.procedures.name) {
       procedimentosFeitos.add(s.procedures.name);
@@ -145,7 +147,11 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     return {
       name: p.name,
       feito: procedimentosFeitos.has(p.name),
-      areas: areasDoProcedimento.map((a) => ({ name: a.name, feito: areasFeitasAqui.has(a.name) })),
+      areas: areasDoProcedimento.map((a) => ({
+        name: a.name,
+        feito: areasFeitasAqui.has(a.name),
+        funcao: a.group_label,
+      })),
     };
   });
 
@@ -238,44 +244,58 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
 
         <div className="rounded-lg border border-border bg-surface p-4">
           <p className="mb-3 text-sm font-medium text-foreground">Estética: feita x em aberto</p>
-          <div className="space-y-3">
-            {procedimentosComStatus.map((p) => (
-              <div key={p.name}>
-                {p.areas.length > 0 ? (
-                  <>
-                    <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          <div className="space-y-4">
+            {procedimentosComStatus.map((p) => {
+              const porFuncao = new Map<string, { name: string; feito: boolean }[]>();
+              for (const a of p.areas) {
+                const chave = a.funcao ?? "Áreas";
+                porFuncao.set(chave, [...(porFuncao.get(chave) ?? []), { name: a.name, feito: a.feito }]);
+              }
+              return (
+                <div key={p.name}>
+                  {p.areas.length > 0 ? (
+                    <>
+                      <p className="mb-1.5 text-sm font-semibold text-foreground">{p.name}</p>
+                      <div className="space-y-2 pl-2">
+                        {Array.from(porFuncao.entries()).map(([funcao, funcaoAreas]) => (
+                          <div key={funcao}>
+                            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              {funcao}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {funcaoAreas.map((a) => (
+                                <span
+                                  key={a.name}
+                                  className={`rounded-full px-2 py-0.5 text-xs ${
+                                    a.feito
+                                      ? "bg-gold-100 text-gold-800 dark:bg-gold-900/30 dark:text-gold-300"
+                                      : "border border-dashed border-border text-muted-foreground"
+                                  }`}
+                                >
+                                  {a.feito ? "✓ " : ""}
+                                  {a.name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  ) : (
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs ${
+                        p.feito
+                          ? "bg-gold-100 text-gold-800 dark:bg-gold-900/30 dark:text-gold-300"
+                          : "border border-dashed border-border text-muted-foreground"
+                      }`}
+                    >
+                      {p.feito ? "✓ " : ""}
                       {p.name}
-                    </p>
-                    <div className="flex flex-wrap gap-1.5">
-                      {p.areas.map((a) => (
-                        <span
-                          key={a.name}
-                          className={`rounded-full px-2 py-0.5 text-xs ${
-                            a.feito
-                              ? "bg-gold-100 text-gold-800 dark:bg-gold-900/30 dark:text-gold-300"
-                              : "border border-dashed border-border text-muted-foreground"
-                          }`}
-                        >
-                          {a.feito ? "✓ " : ""}
-                          {a.name}
-                        </span>
-                      ))}
-                    </div>
-                  </>
-                ) : (
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs ${
-                      p.feito
-                        ? "bg-gold-100 text-gold-800 dark:bg-gold-900/30 dark:text-gold-300"
-                        : "border border-dashed border-border text-muted-foreground"
-                    }`}
-                  >
-                    {p.feito ? "✓ " : ""}
-                    {p.name}
-                  </span>
-                )}
-              </div>
-            ))}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
           </div>
           <p className="mt-3 text-xs text-muted-foreground">
             Marcados são os que a cliente já fez. Os pontilhados são oportunidade de venda cruzada.
