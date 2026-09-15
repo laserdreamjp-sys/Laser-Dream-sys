@@ -3,28 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-
-type ChangeRequest = {
-  id: string;
-  table_name: string;
-  record_id: string;
-  record_label: string | null;
-  action: "edit" | "delete";
-  payload: Record<string, unknown> | null;
-  requested_at: string;
-  profiles: { full_name: string } | null;
-};
-
-const TABLE_LABELS: Record<string, string> = {
-  sales: "Venda",
-  cash_transactions: "Lançamento de caixa",
-  clients: "Cliente",
-  procedures: "Procedimento",
-  sellers: "Vendedora",
-  payment_methods: "Forma de pagamento",
-  lead_origins: "Origem do lead",
-  cash_categories: "Categoria de caixa",
-};
+import { type ChangeRequest } from "@/lib/change-request-labels";
 
 export function RequestActions({ request, userId }: { request: ChangeRequest; userId: string }) {
   const router = useRouter();
@@ -122,6 +101,3 @@ export function RequestActions({ request, userId }: { request: ChangeRequest; us
     </div>
   );
 }
-
-export { TABLE_LABELS };
-export type { ChangeRequest };

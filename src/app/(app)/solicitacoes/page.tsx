@@ -1,33 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
-import { RequestActions, TABLE_LABELS, type ChangeRequest } from "@/components/request-actions";
+import { RequestActions } from "@/components/request-actions";
+import { TABLE_LABELS, type ChangeRequest } from "@/lib/change-request-labels";
 import { DuplicatesPanel } from "@/components/duplicates-panel";
-import { DiagErrorBoundary } from "@/components/diag-error-boundary";
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString("pt-BR");
 }
 
 export default async function SolicitacoesPage() {
-  try {
-    return await SolicitacoesContent();
-  } catch (err) {
-    console.error("[solicitacoes] erro real:", err);
-    const mensagem = err instanceof Error ? err.message : String(err);
-    const stack = err instanceof Error ? err.stack : "";
-    return (
-      <div className="rounded-lg border border-destructive bg-destructive/5 p-5">
-        <p className="font-medium text-destructive">Erro real capturado (diagnóstico temporário):</p>
-        <pre className="mt-2 whitespace-pre-wrap text-xs text-destructive">{mensagem}</pre>
-        <pre className="mt-2 max-h-64 overflow-y-auto whitespace-pre-wrap text-[10px] text-muted-foreground">
-          {stack}
-        </pre>
-      </div>
-    );
-  }
-}
-
-async function SolicitacoesContent() {
   const supabase = createClient();
   const { userId, isAdmin } = await getCurrentProfile();
 
@@ -124,38 +105,34 @@ async function SolicitacoesContent() {
         <p className="text-sm text-muted-foreground">Alterações e exclusões pedidas pela equipe, aguardando aprovação.</p>
       </div>
 
-      <DiagErrorBoundary label="Painel de duplicidade">
-        <DuplicatesPanel flags={(duplicatesRes.data ?? []) as never} />
-      </DiagErrorBoundary>
+      <DuplicatesPanel flags={(duplicatesRes.data ?? []) as never} />
 
       <section>
         <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">Pendentes</h3>
-        <DiagErrorBoundary label="Lista de pendentes">
-          <ul className="divide-y divide-gold-50 rounded-lg border border-border bg-surface text-sm">
-            {pending.map((req) => (
-              <li key={req.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-                <div className="flex-1">
-                  <p className="text-foreground">
-                    <span className="font-medium">{req.profiles?.full_name}</span> pediu{" "}
-                    {req.action === "delete" ? "exclusão" : "alteração"} de{" "}
-                    {TABLE_LABELS[req.table_name] ?? req.table_name}
-                    {req.record_label ? ` — ${req.record_label}` : ""}
+        <ul className="divide-y divide-gold-50 rounded-lg border border-border bg-surface text-sm">
+          {pending.map((req) => (
+            <li key={req.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+              <div className="flex-1">
+                <p className="text-foreground">
+                  <span className="font-medium">{req.profiles?.full_name}</span> pediu{" "}
+                  {req.action === "delete" ? "exclusão" : "alteração"} de{" "}
+                  {TABLE_LABELS[req.table_name] ?? req.table_name}
+                  {req.record_label ? ` — ${req.record_label}` : ""}
+                </p>
+                {req.action === "edit" && req.payload && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Novo(s) valor(es): {JSON.stringify(req.payload)}
                   </p>
-                  {req.action === "edit" && req.payload && (
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Novo(s) valor(es): {JSON.stringify(req.payload)}
-                    </p>
-                  )}
-                  <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(req.requested_at)}</p>
-                </div>
-                <RequestActions request={req} userId={userId} />
-              </li>
-            ))}
-            {pending.length === 0 && (
-              <li className="px-4 py-8 text-center text-muted-foreground">Nenhuma solicitação pendente.</li>
-            )}
-          </ul>
-        </DiagErrorBoundary>
+                )}
+                <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(req.requested_at)}</p>
+              </div>
+              <RequestActions request={req} userId={userId} />
+            </li>
+          ))}
+          {pending.length === 0 && (
+            <li className="px-4 py-8 text-center text-muted-foreground">Nenhuma solicitação pendente.</li>
+          )}
+        </ul>
       </section>
 
       <section>
