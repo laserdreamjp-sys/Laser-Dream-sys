@@ -46,6 +46,9 @@ export function NewSaleForm({
   const [saleDate, setSaleDate] = useState(new Date().toISOString().slice(0, 10));
   const [unitId, setUnitId] = useState(units[0]?.id ?? "");
   const [clientId, setClientId] = useState(initialClientId ?? "");
+  const [clienteCpf, setClienteCpf] = useState("");
+  const [clienteNascimento, setClienteNascimento] = useState("");
+  const [clienteDadosCarregados, setClienteDadosCarregados] = useState(false);
   const [sellerId, setSellerId] = useState(initialSellerId ?? "");
   const [coSellerId, setCoSellerId] = useState("");
   const [isDupla, setIsDupla] = useState(false);
@@ -140,10 +143,48 @@ export function NewSaleForm({
     );
   }
 
+  useEffect(() => {
+    if (!clientId) {
+      setClienteCpf("");
+      setClienteNascimento("");
+      setClienteDadosCarregados(false);
+      return;
+    }
+    setClienteDadosCarregados(false);
+    supabase
+      .from("clients")
+      .select("cpf, birth_date")
+      .eq("id", clientId)
+      .single()
+      .then(({ data }) => {
+        setClienteCpf((data as { cpf: string | null } | null)?.cpf ?? "");
+        setClienteNascimento((data as { birth_date: string | null } | null)?.birth_date ?? "");
+        setClienteDadosCarregados(true);
+      });
+  }, [clientId, supabase]);
+
+  const faltaCpfOuNascimento = clienteDadosCarregados && Boolean(clientId) && (!clienteCpf.trim() || !clienteNascimento.trim());
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError(null);
+
+    if (!clienteCpf.trim() || !clienteNascimento.trim()) {
+      setSaving(false);
+      setError("Pra confirmar a venda, o cliente precisa ter CPF e data de nascimento preenchidos.");
+      return;
+    }
+
+    const { error: clientUpdateError } = await supabase
+      .from("clients")
+      .update({ cpf: clienteCpf.trim(), birth_date: clienteNascimento })
+      .eq("id", clientId);
+    if (clientUpdateError) {
+      setSaving(false);
+      setError(`Não foi possível gravar o CPF/nascimento do cliente: ${clientUpdateError.message}`);
+      return;
+    }
 
     const { data: sale, error: saleError } = await supabase
       .from("sales")
@@ -237,6 +278,37 @@ export function NewSaleForm({
             onChange={setClientId}
           />
         </Field>
+
+        {clientId && clienteDadosCarregados && (
+          <div className={`grid grid-cols-1 gap-4 rounded-md border p-3 sm:grid-cols-2 ${
+            faltaCpfOuNascimento ? "border-destructive/40 bg-destructive/5" : "border-border"
+          }`}>
+            {faltaCpfOuNascimento && (
+              <p className="col-span-full text-xs text-destructive">
+                Esse cliente está sem CPF e/ou data de nascimento. Preenche aqui pra poder confirmar a venda — vai
+                gravado direto no cadastro dele.
+              </p>
+            )}
+            <Field label="CPF">
+              <input
+                required
+                value={clienteCpf}
+                onChange={(e) => setClienteCpf(e.target.value)}
+                placeholder="000.000.000-00"
+                className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
+              />
+            </Field>
+            <Field label="Data de nascimento">
+              <input
+                required
+                type="date"
+                value={clienteNascimento}
+                onChange={(e) => setClienteNascimento(e.target.value)}
+                className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
+              />
+            </Field>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Vendedor(a) responsável">
@@ -448,7 +520,7 @@ export function NewSaleForm({
 
       <button
         type="submit"
-        disabled={saving}
+        disabled={saving || !clientId || !clienteDadosCarregados || !clienteCpf.trim() || !clienteNascimento.trim()}
         className="rounded-md bg-gold-500 px-6 py-2 text-sm font-medium text-white hover:bg-gold-600 disabled:opacity-60"
       >
         {saving ? "Salvando..." : "Registrar venda"}
