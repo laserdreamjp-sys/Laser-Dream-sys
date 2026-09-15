@@ -54,9 +54,14 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
   const selectedMonth = searchParams.mes ?? currentMonthStr();
   const { de, ate } = monthBounds(selectedMonth);
 
-  const proceduresRes = await supabase.from("procedures").select("id, name").order("name");
+  const proceduresRes = await supabase.from("procedures").select("id, name, segment").order("name");
   const sellersRes = await supabase.from("sellers").select("id, name").order("name");
   const paymentMethodsRes = await supabase.from("payment_methods").select("id, name").order("name");
+  const areasRes = await supabase
+    .from("procedure_areas")
+    .select("id, name, group_label, procedure_id, segment")
+    .eq("active", true)
+    .order("name");
 
   const procedimentos = listaOuVazio(searchParams.procedimento);
   const vendedores = listaOuVazio(searchParams.vendedor);
@@ -68,7 +73,7 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
   let query = supabase
     .from("sales")
     .select(
-      "id, sale_date, amount, status, tipo_venda, payment_method_id, notes, created_at, clients(name), sellers!sales_seller_id_fkey(name), procedures(id, name, segment), payment_methods(name), profiles!sales_created_by_fkey(full_name)"
+      "id, sale_date, amount, status, tipo_venda, payment_method_id, procedure_id, client_id, seller_id, notes, created_at, clients(name), sellers!sales_seller_id_fkey(name), procedures(id, name, segment), payment_methods(name), profiles!sales_created_by_fkey(full_name)"
     )
     .gte("sale_date", de)
     .lte("sale_date", ate)
@@ -99,6 +104,9 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
     status: string;
     tipo_venda: string | null;
     payment_method_id: string;
+    procedure_id: string | null;
+    client_id: string;
+    seller_id: string | null;
     notes: string | null;
     created_at: string;
     clients: { name: string } | null;
@@ -115,16 +123,20 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
 
   const saleIds = sales.map((s) => s.id);
   const areasBySale = new Map<string, string[]>();
+  const areaIdsBySale = new Map<string, string[]>();
   if (saleIds.length > 0) {
     const { data: saleAreasRaw, error: areasErr } = await supabase
       .from("sale_areas")
-      .select("sale_id, procedure_areas(name)")
+      .select("sale_id, area_id, procedure_areas(name)")
       .in("sale_id", saleIds);
 
     if (areasErr) throw new Error(`Falha ao carregar as áreas das vendas: ${areasErr.message}`);
 
-    type SaleAreaRow = { sale_id: string; procedure_areas: { name: string } | null };
+    type SaleAreaRow = { sale_id: string; area_id: string; procedure_areas: { name: string } | null };
     for (const row of (saleAreasRaw ?? []) as unknown as SaleAreaRow[]) {
+      const idList = areaIdsBySale.get(row.sale_id) ?? [];
+      idList.push(row.area_id);
+      areaIdsBySale.set(row.sale_id, idList);
       if (!row.procedure_areas) continue;
       const list = areasBySale.get(row.sale_id) ?? [];
       list.push(row.procedure_areas.name);
@@ -298,6 +310,16 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
                       currentPaymentMethodId={sale.payment_method_id}
                       currentNotes={sale.notes}
                       paymentMethods={paymentMethods}
+                      currentSaleDate={sale.sale_date}
+                      currentClientId={sale.client_id}
+                      currentClientName={sale.clients?.name ?? ""}
+                      currentSellerId={sale.seller_id}
+                      currentProcedureId={sale.procedure_id}
+                      currentTipoVenda={sale.tipo_venda}
+                      currentAreaIds={areaIdsBySale.get(sale.id) ?? []}
+                      sellers={sellersRes.data ?? []}
+                      procedures={proceduresRes.data ?? []}
+                      areas={areasRes.data ?? []}
                     />
                   )}
                 </td>
