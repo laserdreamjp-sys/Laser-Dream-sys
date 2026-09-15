@@ -99,15 +99,39 @@ export async function GET(request: NextRequest) {
     await criarTarefa(o.id, "Confirmar avaliação marcada para amanhã", agora.toISOString().slice(0, 10), "confirmar_avaliacao");
   }
 
-  // ===== regra 3: follow-up a cada 2 dias (ja teve contato, sem avaliacao futura marcada) =====
+  // ===== regra 3: primeiro follow-up da sequencia (o resto anda sozinho via gatilho,
+  // so quando o usuario confirma cada etapa marcando a tarefa como feita) =====
+  const followupTagsRes = await supabase
+    .from("tags")
+    .select("id, name")
+    .eq("organization_id", ORGANIZATION_ID)
+    .like("name", "Follow-up %");
+  const followupTagIds = new Set(((followupTagsRes.data ?? []) as { id: string; name: string }[]).map((t) => t.id));
+
+  const oppTagsRes =
+    oppIds.length > 0
+      ? await supabase.from("opportunity_tags").select("opportunity_id, tag_id").in("opportunity_id", oppIds)
+      : { data: [] as { opportunity_id: string; tag_id: string }[] };
+  const oppsComFollowupTag = new Set(
+    ((oppTagsRes.data ?? []) as { opportunity_id: string; tag_id: string }[])
+      .filter((t) => followupTagIds.has(t.tag_id))
+      .map((t) => t.opportunity_id)
+  );
+
   for (const o of oppsAbertas) {
     const ultimaNota = ultimaNotaPorOpp.get(o.id);
     if (!ultimaNota) continue; // regra 1 cuida de quem nunca teve contato
     const temAvaliacaoFutura = o.data_avaliacao && new Date(o.data_avaliacao) > agora;
     if (temAvaliacaoFutura) continue;
+    if (oppsComFollowupTag.has(o.id)) continue; // sequencia ja comecou, o gatilho cuida do resto
     if (diffDias(ultimaNota, agora) < 2) continue;
-    if (temTarefaAberta(o.id, "follow_up")) continue;
-    await criarTarefa(o.id, "Follow-up — sem novidade há 2 dias ou mais", agora.toISOString().slice(0, 10), "follow_up");
+    if (temTarefaAberta(o.id, "followup_confirmar_1")) continue;
+    await criarTarefa(
+      o.id,
+      "Confirmar follow-up 1 — você entrou em contato de novo?",
+      agora.toISOString().slice(0, 10),
+      "followup_confirmar_1"
+    );
   }
 
   // ===== bonus: reativacao 30 dias apos perder por "Sumiu" =====
