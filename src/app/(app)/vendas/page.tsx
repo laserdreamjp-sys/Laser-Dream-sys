@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
 import { SaleRowActions } from "@/components/sale-row-actions";
 import { MonthSwitcher } from "@/components/month-switcher";
+import { ColumnFilter } from "@/components/column-filter";
+import { Pagination } from "@/components/pagination";
 
 function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -29,6 +31,10 @@ function monthBounds(monthStr: string) {
   return { de, ate };
 }
 
+function listaOuVazio(valor?: string): string[] {
+  return (valor ?? "").split(",").filter(Boolean);
+}
+
 type SearchParams = {
   mes?: string;
   procedimento?: string;
@@ -37,6 +43,8 @@ type SearchParams = {
   pagamento?: string;
   tipo?: string;
   status?: string;
+  pagina?: string;
+  porPagina?: string;
 };
 
 export default async function VendasPage({ searchParams }: { searchParams: SearchParams }) {
@@ -50,6 +58,13 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
   const sellersRes = await supabase.from("sellers").select("id, name").order("name");
   const paymentMethodsRes = await supabase.from("payment_methods").select("id, name").order("name");
 
+  const procedimentos = listaOuVazio(searchParams.procedimento);
+  const vendedores = listaOuVazio(searchParams.vendedor);
+  const segmentos = listaOuVazio(searchParams.segmento);
+  const pagamentos = listaOuVazio(searchParams.pagamento);
+  const tipos = listaOuVazio(searchParams.tipo);
+  const statuses = listaOuVazio(searchParams.status);
+
   let query = supabase
     .from("sales")
     .select(
@@ -58,13 +73,13 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
     .gte("sale_date", de)
     .lte("sale_date", ate)
     .order("sale_date", { ascending: false })
-    .limit(500);
+    .limit(1000);
 
-  if (searchParams.procedimento) query = query.eq("procedure_id", searchParams.procedimento);
-  if (searchParams.vendedor) query = query.eq("seller_id", searchParams.vendedor);
-  if (searchParams.pagamento) query = query.eq("payment_method_id", searchParams.pagamento);
-  if (searchParams.tipo) query = query.eq("tipo_venda", searchParams.tipo);
-  if (searchParams.status) query = query.eq("status", searchParams.status);
+  if (procedimentos.length > 0) query = query.in("procedure_id", procedimentos);
+  if (vendedores.length > 0) query = query.in("seller_id", vendedores);
+  if (pagamentos.length > 0) query = query.in("payment_method_id", pagamentos);
+  if (tipos.length > 0) query = query.in("tipo_venda", tipos);
+  if (statuses.length > 0) query = query.in("status", statuses);
 
   const { data: salesRaw, error: salesError } = await query;
 
@@ -94,8 +109,8 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
   };
 
   let sales = (salesRaw ?? []) as unknown as SaleRow[];
-  if (searchParams.segmento) {
-    sales = sales.filter((s) => s.procedures?.segment === searchParams.segmento);
+  if (segmentos.length > 0) {
+    sales = sales.filter((s) => s.procedures?.segment && segmentos.includes(s.procedures.segment));
   }
 
   const saleIds = sales.map((s) => s.id);
@@ -124,8 +139,16 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
     .reduce((acc, s) => acc + Number(s.amount), 0);
   const qtdMesAtivas = sales.filter((s) => s.status === "ativa").length;
 
+  const pageSize = [25, 50, 100].includes(Number(searchParams.porPagina)) ? Number(searchParams.porPagina) : 50;
+  const page = Math.max(1, Number(searchParams.pagina) || 1);
+  const totalFiltrado = sales.length;
+  const salesPagina = sales.slice((page - 1) * pageSize, page * pageSize);
+
   const otherParams = Object.fromEntries(
-    Object.entries(searchParams).filter(([k, v]) => v && k !== "mes")
+    Object.entries(searchParams).filter(([k, v]) => v && k !== "mes" && k !== "pagina" && k !== "porPagina")
+  ) as Record<string, string>;
+  const currentParams = Object.fromEntries(
+    Object.entries(searchParams).filter(([, v]) => v)
   ) as Record<string, string>;
 
   const exportParams = new URLSearchParams({ ...otherParams, de, ate }).toString();
@@ -163,50 +186,58 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
         </div>
       </div>
 
-      <form className="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-border bg-surface p-4 sm:grid-cols-3 lg:grid-cols-6">
-        <input type="hidden" name="mes" value={selectedMonth} />
-        <select name="procedimento" defaultValue={searchParams.procedimento ?? ""} className="rounded-md border border-border bg-background px-2 py-1 text-xs">
-          <option value="">Procedimento</option>
-          {(proceduresRes.data ?? []).map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
-        <select name="vendedor" defaultValue={searchParams.vendedor ?? ""} className="rounded-md border border-border bg-background px-2 py-1 text-xs">
-          <option value="">Vendedor(a)</option>
-          {(sellersRes.data ?? []).map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
-        <select name="segmento" defaultValue={searchParams.segmento ?? ""} className="rounded-md border border-border bg-background px-2 py-1 text-xs">
-          <option value="">Segmento</option>
-          <option value="laser">Laser</option>
-          <option value="estetica">Estética</option>
-        </select>
-        <select name="pagamento" defaultValue={searchParams.pagamento ?? ""} className="rounded-md border border-border bg-background px-2 py-1 text-xs">
-          <option value="">Pagamento</option>
-          {paymentMethods.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
-        <select name="tipo" defaultValue={searchParams.tipo ?? ""} className="rounded-md border border-border bg-background px-2 py-1 text-xs">
-          <option value="">Tipo</option>
-          <option value="REVENDA">Revenda</option>
-          <option value="VENDA NOVA">Venda nova</option>
-        </select>
-        <select name="status" defaultValue={searchParams.status ?? ""} className="rounded-md border border-border bg-background px-2 py-1 text-xs">
-          <option value="">Status</option>
-          <option value="ativa">Ativa</option>
-          <option value="cancelada">Cancelada</option>
-        </select>
-        <div className="col-span-2 flex gap-2 sm:col-span-3 lg:col-span-6">
-          <button type="submit" className="rounded-md bg-gold-500 px-4 py-1.5 text-xs font-medium text-white hover:bg-gold-600">
-            Filtrar
-          </button>
-          <Link href={`/vendas?mes=${selectedMonth}`} className="rounded-md border border-border px-4 py-1.5 text-xs text-foreground hover:bg-muted">
-            Limpar filtros
+      <div className="mb-4 grid grid-cols-2 gap-3 rounded-lg border border-border bg-surface p-4 sm:grid-cols-3 lg:grid-cols-6">
+        <ColumnFilter
+          label="Procedimento"
+          paramName="procedimento"
+          options={(proceduresRes.data ?? []).map((p) => ({ value: p.id, label: p.name }))}
+          currentParams={{ ...currentParams, mes: selectedMonth }}
+        />
+        <ColumnFilter
+          label="Vendedor(a)"
+          paramName="vendedor"
+          options={(sellersRes.data ?? []).map((s) => ({ value: s.id, label: s.name }))}
+          currentParams={{ ...currentParams, mes: selectedMonth }}
+        />
+        <ColumnFilter
+          label="Segmento"
+          paramName="segmento"
+          options={[
+            { value: "laser", label: "Laser" },
+            { value: "estetica", label: "Estética" },
+          ]}
+          currentParams={{ ...currentParams, mes: selectedMonth }}
+        />
+        <ColumnFilter
+          label="Pagamento"
+          paramName="pagamento"
+          options={paymentMethods.map((p) => ({ value: p.id, label: p.name }))}
+          currentParams={{ ...currentParams, mes: selectedMonth }}
+        />
+        <ColumnFilter
+          label="Tipo"
+          paramName="tipo"
+          options={[
+            { value: "REVENDA", label: "Revenda" },
+            { value: "VENDA NOVA", label: "Venda nova" },
+          ]}
+          currentParams={{ ...currentParams, mes: selectedMonth }}
+        />
+        <ColumnFilter
+          label="Status"
+          paramName="status"
+          options={[
+            { value: "ativa", label: "Ativa" },
+            { value: "cancelada", label: "Cancelada" },
+          ]}
+          currentParams={{ ...currentParams, mes: selectedMonth }}
+        />
+        <div className="col-span-2 sm:col-span-3 lg:col-span-6">
+          <Link href={`/vendas?mes=${selectedMonth}`} className="text-xs text-muted-foreground underline hover:text-foreground">
+            Limpar todos os filtros
           </Link>
         </div>
-      </form>
+      </div>
 
       <div className="overflow-x-auto rounded-lg border border-border bg-surface">
         <table className="w-full text-sm">
@@ -227,7 +258,7 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
             </tr>
           </thead>
           <tbody>
-            {sales.map((sale) => (
+            {salesPagina.map((sale) => (
               <tr key={sale.id} className="border-t border-border align-top">
                 <td className="px-4 py-3 whitespace-nowrap">{formatDate(sale.sale_date)}</td>
                 <td className="px-4 py-3">{sale.clients?.name}</td>
@@ -273,7 +304,7 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
               </tr>
             ))}
 
-            {sales.length === 0 && (
+            {salesPagina.length === 0 && (
               <tr>
                 <td colSpan={12} className="px-4 py-8 text-center text-muted-foreground">
                   Nenhuma venda encontrada em {selectedMonth} para esses filtros.
@@ -282,6 +313,7 @@ export default async function VendasPage({ searchParams }: { searchParams: Searc
             )}
           </tbody>
         </table>
+        <Pagination page={page} pageSize={pageSize} total={totalFiltrado} otherParams={{ ...otherParams, mes: selectedMonth }} />
       </div>
     </div>
   );
