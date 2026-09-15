@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
 import { RequestActions, TABLE_LABELS, type ChangeRequest } from "@/components/request-actions";
 import { DuplicatesPanel } from "@/components/duplicates-panel";
+import { DiagErrorBoundary } from "@/components/diag-error-boundary";
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString("pt-BR");
@@ -104,34 +105,38 @@ export default async function SolicitacoesPage() {
         <p className="text-sm text-muted-foreground">Alterações e exclusões pedidas pela equipe, aguardando aprovação.</p>
       </div>
 
-      <DuplicatesPanel flags={(duplicatesRes.data ?? []) as never} />
+      <DiagErrorBoundary label="Painel de duplicidade">
+        <DuplicatesPanel flags={(duplicatesRes.data ?? []) as never} />
+      </DiagErrorBoundary>
 
       <section>
         <h3 className="mb-3 text-sm font-medium uppercase tracking-wide text-muted-foreground">Pendentes</h3>
-        <ul className="divide-y divide-gold-50 rounded-lg border border-border bg-surface text-sm">
-          {pending.map((req) => (
-            <li key={req.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-              <div className="flex-1">
-                <p className="text-foreground">
-                  <span className="font-medium">{req.profiles?.full_name}</span> pediu{" "}
-                  {req.action === "delete" ? "exclusão" : "alteração"} de{" "}
-                  {TABLE_LABELS[req.table_name] ?? req.table_name}
-                  {req.record_label ? ` — ${req.record_label}` : ""}
-                </p>
-                {req.action === "edit" && req.payload && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Novo(s) valor(es): {JSON.stringify(req.payload)}
+        <DiagErrorBoundary label="Lista de pendentes">
+          <ul className="divide-y divide-gold-50 rounded-lg border border-border bg-surface text-sm">
+            {pending.map((req) => (
+              <li key={req.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
+                <div className="flex-1">
+                  <p className="text-foreground">
+                    <span className="font-medium">{req.profiles?.full_name}</span> pediu{" "}
+                    {req.action === "delete" ? "exclusão" : "alteração"} de{" "}
+                    {TABLE_LABELS[req.table_name] ?? req.table_name}
+                    {req.record_label ? ` — ${req.record_label}` : ""}
                   </p>
-                )}
-                <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(req.requested_at)}</p>
-              </div>
-              <RequestActions request={req} userId={userId} />
-            </li>
-          ))}
-          {pending.length === 0 && (
-            <li className="px-4 py-8 text-center text-muted-foreground">Nenhuma solicitação pendente.</li>
-          )}
-        </ul>
+                  {req.action === "edit" && req.payload && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Novo(s) valor(es): {JSON.stringify(req.payload)}
+                    </p>
+                  )}
+                  <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(req.requested_at)}</p>
+                </div>
+                <RequestActions request={req} userId={userId} />
+              </li>
+            ))}
+            {pending.length === 0 && (
+              <li className="px-4 py-8 text-center text-muted-foreground">Nenhuma solicitação pendente.</li>
+            )}
+          </ul>
+        </DiagErrorBoundary>
       </section>
 
       <section>
