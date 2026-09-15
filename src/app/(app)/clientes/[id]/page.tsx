@@ -74,7 +74,7 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
   const salesRes = await supabase
     .from("sales")
     .select(
-      "id, sale_date, amount, status, procedures(name, segment), payment_methods(name), sellers(name), co_seller:sellers!sales_co_seller_id_fkey(name), sale_areas(procedure_areas(name))"
+      "id, sale_date, amount, status, procedures(name, segment), payment_methods(name), sellers!sales_seller_id_fkey(name), co_seller:sellers!sales_co_seller_id_fkey(name), sale_areas(procedure_areas(name))"
     )
     .eq("client_id", params.id)
     .order("sale_date", { ascending: false });

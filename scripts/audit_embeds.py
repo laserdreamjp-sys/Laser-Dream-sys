@@ -20,8 +20,8 @@ SRC = pathlib.Path(__file__).parent.parent / "src"
 
 # .from("x") seguido em ate ~600 chars por .select("...")
 CALL = re.compile(r'\.from\(\s*"(\w+)"\s*\)([\s\S]{0,600}?)\.select\(\s*(["\'`])([\s\S]*?)\3', re.M)
-# nomes embutidos no select: palavra seguida de "(" que nao seja funcao conhecida
-EMBED = re.compile(r'(?<![\w!])(\w+)\s*\(')
+# cada embutido: alias opcional, nome da tabela, !fkey opcional, abre parenteses
+EMBED = re.compile(r'(?<![\w!])(?:\w+:)?(\w+)(!\w+)?\s*\(')
 
 problemas = []
 verificados = 0
@@ -32,21 +32,15 @@ for path in sorted(SRC.rglob("*.ts")) + sorted(SRC.rglob("*.tsx")):
         origem, _meio, _q, select = m.group(1), m.group(2), m.group(3), m.group(4)
         linha = texto[: m.start()].count("\n") + 1
 
-        # embeds com FK explicita: tabela!constraint(...)
-        explicitos = set(re.findall(r'(\w+)!(\w+)\s*\(', select))
-        explicit_tables = {t for t, _ in explicitos}
-
-        for destino in EMBED.findall(select):
-            if destino in explicit_tables:
-                continue
+        for destino, fkey in EMBED.findall(select):
             par = (origem, destino)
             if par not in FK_PAIRS:
                 continue  # nao e um relacionamento direto; ignora
             verificados += 1
-            if FK_PAIRS[par] > 1:
+            if FK_PAIRS[par] > 1 and not fkey:
                 problemas.append(
                     f"{path.relative_to(SRC.parent)}:{linha}  "
-                    f"{origem} -> {destino} tem {FK_PAIRS[par]} ligacoes e o embed "
+                    f"{origem} -> {destino} tem {FK_PAIRS[par]} ligacoes e essa ocorrencia especifica "
                     f"nao diz qual usar (precisa de {destino}!nome_da_fkey)"
                 )
 
