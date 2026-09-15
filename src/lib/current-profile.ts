@@ -27,5 +27,6 @@ export async function getCurrentProfile() {
     fullName: profile?.full_name ?? "",
     roleName,
     isAdmin: roleName === "Administrador",
+    isManager: roleName === "Gerente",
   };
 }
