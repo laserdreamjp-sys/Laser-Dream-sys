@@ -45,6 +45,7 @@ type Opportunity = {
   lead_origin_id: string | null;
   referred_by_name: string | null;
   interesse_procedure_id: string | null;
+  data_avaliacao: string | null;
   clients: { name: string } | null;
   sellers: { name: string } | null;
 };
@@ -374,6 +375,7 @@ export function FunilBoard({
           leadOriginId={openOpportunity.lead_origin_id}
           referredByName={openOpportunity.referred_by_name}
           interesseProcedureId={openOpportunity.interesse_procedure_id}
+          dataAvaliacao={openOpportunity.data_avaliacao}
           notes={notesByOpportunity[openOpportunity.id] ?? []}
           tags={tagsByOpportunity[openOpportunity.id] ?? []}
           tasks={tasksByOpportunity[openOpportunity.id] ?? []}

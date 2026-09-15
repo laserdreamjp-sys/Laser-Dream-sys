@@ -32,6 +32,7 @@ export function LeadDetailModal({
   leadOriginId,
   referredByName,
   interesseProcedureId,
+  dataAvaliacao,
   notes,
   tags,
   tasks,
@@ -50,6 +51,7 @@ export function LeadDetailModal({
   leadOriginId: string | null;
   referredByName: string | null;
   interesseProcedureId: string | null;
+  dataAvaliacao: string | null;
   notes: Note[];
   tags: Tag[];
   tasks: Task[];
@@ -70,6 +72,10 @@ export function LeadDetailModal({
   const [localReferredBy, setLocalReferredBy] = useState(referredByName ?? "");
   const [localProcedureId, setLocalProcedureId] = useState(interesseProcedureId ?? "");
   const [localAreaIds, setLocalAreaIds] = useState<string[]>(interestAreaIds);
+  const [localDataAvaliacao, setLocalDataAvaliacao] = useState(
+    dataAvaliacao ? dataAvaliacao.slice(0, 16) : ""
+  );
+  const [savingAvaliacao, setSavingAvaliacao] = useState(false);
   const [savingInterest, setSavingInterest] = useState(false);
 
   const [localNotes, setLocalNotes] = useState(notes);
@@ -95,6 +101,16 @@ export function LeadDetailModal({
     if (proc.segment === "laser") return areas.filter((a) => a.segment === "laser");
     return areas.filter((a) => a.procedure_id === localProcedureId);
   }, [areas, procedures, localProcedureId]);
+
+  async function salvarAvaliacao() {
+    setSavingAvaliacao(true);
+    await supabase
+      .from("opportunities")
+      .update({ data_avaliacao: localDataAvaliacao ? new Date(localDataAvaliacao).toISOString() : null })
+      .eq("id", opportunityId);
+    setSavingAvaliacao(false);
+    router.refresh();
+  }
 
   async function salvarInteresse() {
     setSavingInterest(true);
@@ -244,6 +260,30 @@ export function LeadDetailModal({
                 />
               )}
             </div>
+          </section>
+
+          <section>
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Avaliação agendada
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                type="datetime-local"
+                value={localDataAvaliacao}
+                onChange={(e) => setLocalDataAvaliacao(e.target.value)}
+                className="rounded-md border border-border bg-background px-3 py-2 text-sm"
+              />
+              <button
+                onClick={salvarAvaliacao}
+                disabled={savingAvaliacao}
+                className="rounded-md bg-gold-500 px-3 py-1.5 text-xs font-medium text-white hover:bg-gold-600 disabled:opacity-60"
+              >
+                {savingAvaliacao ? "Salvando..." : "Salvar data"}
+              </button>
+            </div>
+            <p className="mt-1 text-[10px] text-muted-foreground">
+              Marcando aqui, o sistema cria sozinho uma tarefa de confirmação um dia antes.
+            </p>
           </section>
 
           <section>
