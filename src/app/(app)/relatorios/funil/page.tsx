@@ -12,7 +12,8 @@ export default async function RelatoriosFunilPage() {
     await Promise.all([
       supabase
         .from("opportunities")
-        .select("id, stage_id, seller_id, sale_id, lead_origin_id, loss_reason_id, created_at, sellers(name)"),
+        .select("id, stage_id, seller_id, sale_id, lead_origin_id, loss_reason_id, created_at, sellers(name)")
+        .eq("is_test", false),
       supabase.from("lead_origins").select("id, name"),
       supabase.from("loss_reasons").select("id, name"),
       supabase.from("pipeline_stages").select("id, name, is_won, is_lost, funnel_id, funnels(name)"),
@@ -72,8 +73,10 @@ export default async function RelatoriosFunilPage() {
   // ===== 3. tempo medio em cada etapa (baseado em opportunity_events) =====
   type Ev = { opportunity_id: string; to_stage_id: string; created_at: string };
   const events = (eventsRes.data ?? []) as Ev[];
+  const idsValidos = new Set(opportunities.map((o) => o.id));
   const eventosPorOpp = new Map<string, Ev[]>();
   for (const e of events) {
+    if (!idsValidos.has(e.opportunity_id)) continue;
     const list = eventosPorOpp.get(e.opportunity_id) ?? [];
     list.push(e);
     eventosPorOpp.set(e.opportunity_id, list);
@@ -100,7 +103,9 @@ export default async function RelatoriosFunilPage() {
 
   // ===== 4. eficacia do follow-up: quantos confirmaram cada etapa vs quantos "morreram" sem responder =====
   const followupTags = (tagsRes.data ?? []) as { id: string; name: string }[];
-  const oppTags = (oppTagsRes.data ?? []) as { opportunity_id: string; tag_id: string }[];
+  const oppTags = ((oppTagsRes.data ?? []) as { opportunity_id: string; tag_id: string }[]).filter((ot) =>
+    idsValidos.has(ot.opportunity_id)
+  );
   const porFollowup = followupTags
     .map((t) => ({
       nome: t.name,

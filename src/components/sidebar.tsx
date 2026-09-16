@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { TestModeToggle } from "@/components/test-mode-toggle";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -96,6 +97,7 @@ export function Sidebar({ fullName, roleName }: { fullName: string; roleName: st
   function AccountBlock() {
     return (
       <div className="space-y-3 border-t border-white/10 pt-4">
+        <TestModeToggle />
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gold-500/20 text-xs font-medium text-gold-300">
             {initials(fullName)}

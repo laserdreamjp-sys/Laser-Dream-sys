@@ -3,6 +3,7 @@ import { getCurrentProfile } from "@/lib/current-profile";
 import { ManageableList } from "@/components/manageable-list";
 import { SettingsForm } from "@/components/settings-form";
 import { DeletePasswordForm } from "@/components/delete-password-form";
+import { ClearTestDataButton } from "@/components/clear-test-data-button";
 import { BackupPanel } from "@/components/backup-panel";
 
 export default async function ConfiguracoesPage() {
@@ -63,6 +64,11 @@ export default async function ConfiguracoesPage() {
               canEdit={isAdmin}
             />
           </div>
+          {isAdmin && (
+            <div className="mt-4">
+              <ClearTestDataButton />
+            </div>
+          )}
         </section>
       )}
 

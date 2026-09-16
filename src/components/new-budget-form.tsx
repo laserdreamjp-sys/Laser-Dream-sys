@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ClientAutocomplete } from "@/components/client-autocomplete";
+import { isModoTesteAtivo } from "@/components/test-mode-toggle";
 
 type Option = { id: string; name: string };
 type Seller = { id: string; name: string; unit_id: string | null };
@@ -120,6 +121,7 @@ export function NewBudgetForm({
         desconto_percentual: tipoDesconto === "percentual" ? Number(descontoPercentual.replace(",", ".")) || 0 : null,
         notes: notes || null,
         valido_ate: validoAte,
+        is_test: isModoTesteAtivo(),
       })
       .select("id")
       .single();
@@ -173,6 +175,11 @@ export function NewBudgetForm({
   return (
     <form onSubmit={handleSubmit} className="max-w-3xl space-y-6">
       <div className="rounded-lg border border-border bg-surface p-5 space-y-4">
+        {isModoTesteAtivo() && (
+          <p className="rounded-md bg-amber-100 px-3 py-2 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+            Modo de teste ligado — esse orçamento não vai aparecer em relatório.
+          </p>
+        )}
         <Field label="Cliente">
           <ClientAutocomplete organizationId={organizationId} value={clientId} onChange={setClientId} />
         </Field>

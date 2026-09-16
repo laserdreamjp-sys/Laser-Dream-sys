@@ -45,6 +45,7 @@ type Opportunity = {
   lead_origin_id: string | null;
   referred_by_name: string | null;
   interesse_procedure_id: string | null;
+  is_test?: boolean;
   data_avaliacao: string | null;
   clients: { name: string } | null;
   sellers: { name: string } | null;
@@ -258,6 +259,11 @@ export function FunilBoard({
                         onOpen={() => setOpenId(o.id)}
                         justDragged={justDraggedId === o.id}
                       >
+                        {o.is_test && (
+                          <span className="mb-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                            TESTE
+                          </span>
+                        )}
                         <p className="font-medium text-foreground">{o.clients?.name ?? "Cliente"}</p>
                         <p className="text-xs text-muted-foreground">
                           {o.sellers?.name ?? "sem vendedora"} · {formatCurrency(o.estimated_value)}

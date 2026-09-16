@@ -78,7 +78,7 @@ export default async function FunilPage({
   let opportunitiesQuery = supabase
     .from("opportunities")
     .select(
-      "id, client_id, stage_id, seller_id, estimated_value, notes, sale_id, loss_reason_id, unit_id, created_by, created_at, lead_origin_id, referred_by_name, interesse_procedure_id, data_avaliacao, clients(name), sellers(name)"
+      "id, client_id, stage_id, seller_id, estimated_value, notes, sale_id, loss_reason_id, unit_id, created_by, created_at, lead_origin_id, referred_by_name, interesse_procedure_id, data_avaliacao, is_test, clients(name), sellers(name)"
     )
     .in("stage_id", stageIds.length > 0 ? stageIds : ["00000000-0000-0000-0000-000000000000"])
     .order("created_at", { ascending: false });
@@ -128,6 +128,7 @@ export default async function FunilPage({
     referred_by_name: string | null;
     interesse_procedure_id: string | null;
     data_avaliacao: string | null;
+    is_test?: boolean;
     clients: { name: string } | null;
     sellers: { name: string } | null;
   }[];

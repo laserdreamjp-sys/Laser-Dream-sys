@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatCpf } from "@/lib/cpf";
+import { isModoTesteAtivo } from "@/components/test-mode-toggle";
 
 type Option = { id: string; name: string };
 type SellerOption = { id: string; name: string; unit_id: string | null };
@@ -137,6 +138,7 @@ export function NewOpportunityButton({
       estimated_value: estimatedValue ? Number(estimatedValue) : null,
       notes: notes || null,
       created_by: currentUserId,
+      is_test: isModoTesteAtivo(),
     });
 
     setSaving(false);
@@ -170,6 +172,11 @@ export function NewOpportunityButton({
             className="w-full max-w-md space-y-3 rounded-lg border border-border bg-surface p-5 shadow-soft"
           >
             <p className="text-sm font-medium text-foreground">Novo lead</p>
+            {isModoTesteAtivo() && (
+              <p className="rounded-md bg-amber-100 px-2 py-1 text-xs text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                Modo de teste ligado — esse lead não vai aparecer em relatório.
+              </p>
+            )}
 
             <div ref={wrapRef} className="relative">
               <label className="mb-1 block text-xs text-muted-foreground">
