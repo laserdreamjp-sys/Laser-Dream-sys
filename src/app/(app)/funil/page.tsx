@@ -239,13 +239,21 @@ export default async function FunilPage({
             Arraste o card para outra coluna, ou clique nele para ver o histórico completo do lead.
           </p>
         </div>
-        <NewOpportunityButton
-          sellers={sellersRes.data ?? []}
-          units={unitsRes.data ?? []}
-          firstStageId={stages[0]?.id ?? ""}
-          organizationId={organizationId}
-          currentUserId={userId}
-        />
+        <div className="flex items-center gap-2">
+          <Link
+            href="/orcamentos/novo"
+            className="rounded-md border border-gold-500 px-4 py-2 text-sm font-medium text-gold-700 hover:bg-gold-50 dark:text-gold-400"
+          >
+            Novo orçamento
+          </Link>
+          <NewOpportunityButton
+            sellers={sellersRes.data ?? []}
+            units={unitsRes.data ?? []}
+            firstStageId={stages[0]?.id ?? ""}
+            organizationId={organizationId}
+            currentUserId={userId}
+          />
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3">

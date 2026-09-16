@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -28,6 +29,7 @@ function formatDate(value: string) {
 
 export function LeadDetailModal({
   opportunityId,
+  clientId,
   clientName,
   leadOriginId,
   referredByName,
@@ -47,6 +49,7 @@ export function LeadDetailModal({
   onClose,
 }: {
   opportunityId: string;
+  clientId: string;
   clientName: string;
   leadOriginId: string | null;
   referredByName: string | null;
@@ -226,11 +229,19 @@ export function LeadDetailModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-lg border border-border bg-surface p-5 shadow-soft">
-        <div className="mb-4 flex items-start justify-between">
+        <div className="mb-4 flex items-start justify-between gap-2">
           <p className="text-lg font-semibold text-foreground">{clientName}</p>
-          <button onClick={onClose} className="text-sm text-muted-foreground hover:text-foreground">
-            Fechar
-          </button>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/orcamentos/novo?opportunityId=${opportunityId}&clientId=${clientId}`}
+              className="rounded-md border border-gold-500 px-3 py-1 text-xs font-medium text-gold-700 hover:bg-gold-50 dark:text-gold-400"
+            >
+              Novo orçamento
+            </Link>
+            <button onClick={onClose} className="text-sm text-muted-foreground hover:text-foreground">
+              Fechar
+            </button>
+          </div>
         </div>
 
         <div className="space-y-5">

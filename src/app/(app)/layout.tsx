@@ -27,9 +27,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen bg-background md:flex">
-      <Sidebar fullName={fullName} roleName={roleName} />
-      <main className="flex-1 overflow-y-auto p-4 md:p-8">
-        <div className="mb-4">
+      <div className="print:hidden">
+        <Sidebar fullName={fullName} roleName={roleName} />
+      </div>
+      <main className="flex-1 overflow-y-auto p-4 md:p-8 print:p-0">
+        <div className="mb-4 print:hidden">
           <GlobalSearch />
         </div>
         {children}

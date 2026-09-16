@@ -371,6 +371,7 @@ export function FunilBoard({
       {openOpportunity && (
         <LeadDetailModal
           opportunityId={openOpportunity.id}
+          clientId={openOpportunity.client_id}
           clientName={openOpportunity.clients?.name ?? "Cliente"}
           leadOriginId={openOpportunity.lead_origin_id}
           referredByName={openOpportunity.referred_by_name}

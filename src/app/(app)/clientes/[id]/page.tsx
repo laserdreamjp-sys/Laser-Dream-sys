@@ -155,6 +155,13 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
     };
   });
 
+  const budgetsRes = await supabase
+    .from("budgets")
+    .select("id, created_at, status")
+    .eq("client_id", params.id)
+    .order("created_at", { ascending: false });
+  const budgets = (budgetsRes.data ?? []) as { id: string; created_at: string; status: string }[];
+
 
   return (
     <div className="space-y-6">
@@ -354,6 +361,35 @@ export default async function ClientDetailPage({ params }: { params: { id: strin
           </tbody>
         </table>
       </div>
+
+      {budgets.length > 0 && (
+        <div className="rounded-lg border border-border bg-surface p-5 shadow-soft">
+          <p className="mb-3 text-sm font-medium text-foreground">Orçamentos</p>
+          <ul className="space-y-1.5 text-sm">
+            {budgets.map((b) => (
+              <li key={b.id} className="flex items-center justify-between">
+                <span className="text-muted-foreground">
+                  {new Date(b.created_at).toLocaleDateString("pt-BR")} ·{" "}
+                  <span
+                    className={
+                      b.status === "convertido"
+                        ? "text-gold-700"
+                        : b.status === "perdido"
+                        ? "text-destructive"
+                        : "text-muted-foreground"
+                    }
+                  >
+                    {b.status}
+                  </span>
+                </span>
+                <Link href={`/orcamentos/${b.id}`} className="text-xs text-gold-700 underline dark:text-gold-400">
+                  Ver / PDF
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
