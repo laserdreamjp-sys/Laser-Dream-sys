@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
 import { ClientReportPicker } from "@/components/client-report-picker";
@@ -93,6 +94,16 @@ export default async function RelatoriosPage({
           </div>
         )}
       </div>
+
+      <Link
+        href="/relatorios/funil"
+        className="block rounded-lg border border-gold-300 bg-gold-50 p-4 hover:bg-gold-100 dark:border-gold-700 dark:bg-gold-900/20"
+      >
+        <p className="text-sm font-medium text-gold-800 dark:text-gold-300">Relatórios do funil →</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Origem que mais converte, por que estamos perdendo lead, onde ele trava, eficácia do follow-up e taxa de fechamento por vendedora.
+        </p>
+      </Link>
 
       <section className="rounded-lg border border-border bg-surface p-4">
         <p className="mb-3 text-sm font-medium text-foreground">

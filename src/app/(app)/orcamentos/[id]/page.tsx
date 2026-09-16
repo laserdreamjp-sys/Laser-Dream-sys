@@ -14,7 +14,7 @@ export default async function OrcamentoPage({ params }: { params: { id: string }
   const budgetRes = await supabase
     .from("budgets")
     .select(
-      "id, created_at, desconto_valor, desconto_percentual, notes, status, clients(name, phone), sellers(name), payment_methods(name)"
+      "id, created_at, valido_ate, desconto_valor, desconto_percentual, notes, status, clients(name, phone), sellers(name), payment_methods(name)"
     )
     .eq("id", params.id)
     .single();
@@ -22,6 +22,7 @@ export default async function OrcamentoPage({ params }: { params: { id: string }
   const budget = budgetRes.data as unknown as {
     id: string;
     created_at: string;
+    valido_ate: string | null;
     desconto_valor: number | null;
     desconto_percentual: number | null;
     notes: string | null;
@@ -72,6 +73,12 @@ export default async function OrcamentoPage({ params }: { params: { id: string }
           </div>
           <p className="text-xs text-muted-foreground">{formatDate(budget.created_at)}</p>
         </div>
+
+        {budget.valido_ate && (
+          <p className="mb-4 text-xs text-muted-foreground">
+            Válido até <span className="font-medium text-foreground">{formatDate(budget.valido_ate)}</span>
+          </p>
+        )}
 
         <div className="mb-6 grid grid-cols-2 gap-4 text-sm">
           <div>

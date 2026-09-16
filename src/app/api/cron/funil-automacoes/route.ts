@@ -179,10 +179,21 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // ===== bonus: orcamento aberto que passou da validade vira "expirado" sozinho =====
+  const hojeStr = agora.toISOString().slice(0, 10);
+  const { data: expirados } = await supabase
+    .from("budgets")
+    .update({ status: "expirado", updated_at: agora.toISOString() })
+    .eq("organization_id", ORGANIZATION_ID)
+    .eq("status", "aberto")
+    .lt("valido_ate", hojeStr)
+    .select("id");
+
   return NextResponse.json({
     ok: true,
     tarefas_criadas: criadas.length,
     detalhe: criadas,
     leads_etiquetados_esfriando: etiquetados,
+    orcamentos_expirados: expirados?.length ?? 0,
   });
 }

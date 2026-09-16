@@ -56,6 +56,11 @@ export function NewBudgetForm({
   const [descontoValor, setDescontoValor] = useState("");
   const [descontoPercentual, setDescontoPercentual] = useState("");
   const [notes, setNotes] = useState("");
+  const [validoAte, setValidoAte] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 7);
+    return d.toISOString().slice(0, 10);
+  });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -114,6 +119,7 @@ export function NewBudgetForm({
         desconto_valor: tipoDesconto === "valor" ? Number(descontoValor.replace(",", ".")) || 0 : null,
         desconto_percentual: tipoDesconto === "percentual" ? Number(descontoPercentual.replace(",", ".")) || 0 : null,
         notes: notes || null,
+        valido_ate: validoAte,
       })
       .select("id")
       .single();
@@ -354,7 +360,16 @@ export function NewBudgetForm({
         </div>
       </div>
 
-      <div className="rounded-lg border border-border bg-surface p-5">
+      <div className="rounded-lg border border-border bg-surface p-5 space-y-4">
+        <Field label="Válido até">
+          <input
+            type="date"
+            value={validoAte}
+            onChange={(e) => setValidoAte(e.target.value)}
+            className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">Padrão de 1 semana a partir de hoje, pode mudar.</p>
+        </Field>
         <Field label="Observações">
           <textarea
             value={notes}
