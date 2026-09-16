@@ -20,7 +20,6 @@ export default async function NovoOrcamentoPage({
 
   const profile = profileRaw as { organization_id: string } | null;
 
-  const clientsRes = await supabase.from("clients").select("id, name").order("name");
   const sellersRes = await supabase.from("sellers").select("id, name, unit_id").eq("active", true).order("name");
   const proceduresRes = await supabase
     .from("procedures")
@@ -47,7 +46,6 @@ export default async function NovoOrcamentoPage({
       </p>
       <NewBudgetForm
         organizationId={profile!.organization_id}
-        clients={clientsRes.data ?? []}
         sellers={sellersRes.data ?? []}
         procedures={(proceduresRes.data ?? []) as never}
         areas={areasRes.data ?? []}

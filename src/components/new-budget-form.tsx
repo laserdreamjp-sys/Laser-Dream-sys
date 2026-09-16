@@ -28,7 +28,6 @@ function formatCurrency(value: number) {
 
 export function NewBudgetForm({
   organizationId,
-  clients,
   sellers,
   procedures,
   areas,
@@ -38,7 +37,6 @@ export function NewBudgetForm({
   initialSellerId,
 }: {
   organizationId: string;
-  clients: Option[];
   sellers: Seller[];
   procedures: Procedure[];
   areas: Area[];
@@ -170,7 +168,7 @@ export function NewBudgetForm({
     <form onSubmit={handleSubmit} className="max-w-3xl space-y-6">
       <div className="rounded-lg border border-border bg-surface p-5 space-y-4">
         <Field label="Cliente">
-          <ClientAutocomplete clients={clients} organizationId={organizationId} value={clientId} onChange={setClientId} />
+          <ClientAutocomplete organizationId={organizationId} value={clientId} onChange={setClientId} />
         </Field>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

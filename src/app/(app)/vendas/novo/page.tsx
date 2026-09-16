@@ -21,7 +21,6 @@ export default async function NovaVendaPage({
   const profile = profileRaw as { organization_id: string } | null;
 
   const unitsRes = await supabase.from("units").select("id, name").eq("active", true).order("name");
-  const clientsRes = await supabase.from("clients").select("id, name").order("name");
   const sellersRes = await supabase
     .from("sellers")
     .select("id, name, unit_id")
@@ -57,7 +56,6 @@ export default async function NovaVendaPage({
         organizationId={profile!.organization_id}
         userId={user!.id}
         units={unitsRes.data ?? []}
-        clients={clientsRes.data ?? []}
         sellers={sellersRes.data ?? []}
         procedures={(proceduresRes.data ?? []) as never}
         areas={areasRes.data ?? []}

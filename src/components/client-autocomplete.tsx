@@ -1,27 +1,30 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { formatCpf } from "@/lib/cpf";
 
-type Client = { id: string; name: string };
+type Client = { id: string; name: string; cpf?: string | null; phone?: string | null };
 
 export function ClientAutocomplete({
-  clients,
   organizationId,
   value,
   onChange,
   onCreated,
 }: {
-  clients: Client[];
   organizationId: string;
   value: string;
   onChange: (clientId: string) => void;
   onCreated?: (client: Client) => void;
 }) {
   const supabase = createClient();
-  const [query, setQuery] = useState(() => clients.find((c) => c.id === value)?.name ?? "");
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  const [nomeSelecionado, setNomeSelecionado] = useState("");
+  const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
-  const [localClients, setLocalClients] = useState(clients);
+  const [buscando, setBuscando] = useState(false);
+  const [matches, setMatches] = useState<Client[]>([]);
 
   const [showModal, setShowModal] = useState(false);
   const [newName, setNewName] = useState("");
@@ -31,13 +34,49 @@ export function ClientAutocomplete({
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  const matches = useMemo(() => {
-    if (!query.trim()) return localClients.slice(0, 8);
-    const q = query.toLowerCase();
-    return localClients.filter((c) => c.name.toLowerCase().includes(q)).slice(0, 8);
-  }, [localClients, query]);
+  // carrega o nome de quem ja vem selecionado (ex.: vindo do funil com clientId pronto)
+  useEffect(() => {
+    if (!value) {
+      setNomeSelecionado("");
+      return;
+    }
+    supabase
+      .from("clients")
+      .select("name")
+      .eq("id", value)
+      .single()
+      .then(({ data }) => setNomeSelecionado((data as { name: string } | null)?.name ?? ""));
+  }, [value, supabase]);
 
-  const showCreateOption = query.trim().length >= 4 && matches.length === 0;
+  useEffect(() => {
+    function onClickFora(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onClickFora);
+    return () => document.removeEventListener("mousedown", onClickFora);
+  }, []);
+
+  useEffect(() => {
+    const termo = query.trim();
+    if (termo.length < 2) {
+      setMatches([]);
+      return;
+    }
+    setBuscando(true);
+    const timeout = setTimeout(async () => {
+      const soDigitos = termo.replace(/\D/g, "");
+      const filtro =
+        soDigitos.length >= 3
+          ? `name.ilike.%${termo}%,cpf.ilike.%${soDigitos}%,phone.ilike.%${soDigitos}%`
+          : `name.ilike.%${termo}%`;
+      const { data } = await supabase.from("clients").select("id, name, cpf, phone").or(filtro).order("name").limit(8);
+      setMatches((data as Client[]) ?? []);
+      setBuscando(false);
+    }, 250);
+    return () => clearTimeout(timeout);
+  }, [query, supabase]);
+
+  const showCreateOption = query.trim().length >= 4 && !buscando && matches.length === 0;
 
   function openCreateModal() {
     setNewName(query.trim());
@@ -73,43 +112,54 @@ export function ClientAutocomplete({
       return;
     }
 
-    setLocalClients((prev) => [...prev, data]);
     onChange(data.id);
-    setQuery(data.name);
+    setNomeSelecionado(data.name);
+    setQuery("");
     setShowModal(false);
     onCreated?.(data);
   }
 
   return (
-    <div className="relative">
+    <div ref={wrapRef} className="relative">
       <input
         required
-        placeholder="Digite para buscar"
-        value={query}
+        placeholder="Digite para buscar (nome, CPF ou telefone)"
+        value={value ? nomeSelecionado : query}
         onChange={(e) => {
           setQuery(e.target.value);
           setOpen(true);
-          if (!e.target.value) onChange("");
+          if (value) onChange("");
         }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onFocus={() => {
+          if (value) {
+            onChange("");
+            setQuery(nomeSelecionado);
+          }
+          setOpen(true);
+        }}
         className="w-full rounded-md border border-border px-3 py-2 text-sm outline-none focus:border-gold-500"
       />
-      {open && (matches.length > 0 || showCreateOption) && (
-        <ul className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-md border border-border bg-surface shadow-md">
-          {matches.map((c) => (
-            <li
-              key={c.id}
-              onMouseDown={() => {
-                onChange(c.id);
-                setQuery(c.name);
-                setOpen(false);
-              }}
-              className="cursor-pointer px-3 py-2 text-sm hover:bg-muted"
-            >
-              {c.name}
-            </li>
-          ))}
+      {open && query.trim().length >= 2 && (
+        <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-border bg-surface shadow-md">
+          {buscando && <li className="px-3 py-2 text-xs text-muted-foreground">Buscando...</li>}
+          {!buscando &&
+            matches.map((c) => (
+              <li
+                key={c.id}
+                onMouseDown={() => {
+                  onChange(c.id);
+                  setNomeSelecionado(c.name);
+                  setQuery("");
+                  setOpen(false);
+                }}
+                className="cursor-pointer px-3 py-2 text-sm hover:bg-muted"
+              >
+                <span className="block font-medium text-foreground">{c.name}</span>
+                <span className="text-xs text-muted-foreground">
+                  {c.cpf ? formatCpf(c.cpf) : "sem CPF"} {c.phone ? `· ${c.phone}` : ""}
+                </span>
+              </li>
+            ))}
           {showCreateOption && (
             <li
               onMouseDown={openCreateModal}

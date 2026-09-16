@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
+import { ClientReportPicker } from "@/components/client-report-picker";
 
 function formatDate(value: string) {
   return new Date(value).toLocaleDateString("pt-BR", { timeZone: "UTC" });
@@ -17,9 +18,12 @@ export default async function RelatoriosPage({
   const supabase = createClient();
   const { isAdmin } = await getCurrentProfile();
 
-  const clientsRes = await supabase.from("clients").select("id, name").order("name");
-  const clients = clientsRes.data ?? [];
   const selectedClientId = searchParams.cliente ?? "";
+  let selectedClientName = "";
+  if (selectedClientId) {
+    const { data } = await supabase.from("clients").select("name").eq("id", selectedClientId).single();
+    selectedClientName = (data as { name: string } | null)?.name ?? "";
+  }
 
   type HistoryRow = {
     id: string;
@@ -94,23 +98,9 @@ export default async function RelatoriosPage({
         <p className="mb-3 text-sm font-medium text-foreground">
           Histórico e oportunidades por cliente
         </p>
-        <form method="get" className="flex gap-2">
-          <select
-            name="cliente"
-            defaultValue={selectedClientId}
-            className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm"
-          >
-            <option value="">Selecione um cliente</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <button type="submit" className="rounded-md bg-gold-500 px-4 py-2 text-sm font-medium text-white hover:bg-gold-600">
-            Ver
-          </button>
-        </form>
+        <div className="flex gap-2">
+          <ClientReportPicker currentClientId={selectedClientId} currentClientName={selectedClientName} />
+        </div>
       </section>
 
       {selectedClientId && (

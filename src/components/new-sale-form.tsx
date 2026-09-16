@@ -15,7 +15,6 @@ export function NewSaleForm({
   organizationId,
   userId,
   units,
-  clients,
   sellers,
   procedures,
   areas,
@@ -29,7 +28,6 @@ export function NewSaleForm({
   organizationId: string;
   userId: string;
   units: Option[];
-  clients: Option[];
   sellers: Seller[];
   procedures: Procedure[];
   areas: Area[];
@@ -272,7 +270,6 @@ export function NewSaleForm({
 
         <Field label="Nome completo do cliente">
           <ClientAutocomplete
-            clients={clients}
             organizationId={organizationId}
             value={clientId}
             onChange={setClientId}
