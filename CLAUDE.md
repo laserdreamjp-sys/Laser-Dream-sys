@@ -1,0 +1,127 @@
+> **REGRA DE OURO: Sempre consulte o arquivo ARCHITECTURE.md antes de criar ou alterar qualquer código, e atualize tanto o ARCHITECTURE.md quanto o CLAUDE.md sempre que uma tabela ou funcionalidade for criada, editada ou removida.**
+
+# CLAUDE.md: memória operacional do Laser Dream OS
+
+Sistema de gestão de clínica (vendas, caixa, clientes, funil comercial, orçamentos, Radar de oportunidades, relatórios). Interface e dados em português do Brasil. Detalhes completos (dicionário de dados, regras de negócio, matriz de rastreabilidade, riscos) estão em `ARCHITECTURE.md`; este arquivo é o resumo operacional.
+
+## 1. Comandos
+
+| Objetivo | Comando |
+|---|---|
+| Instalar dependências | `npm install` |
+| Rodar em desenvolvimento (http://localhost:3000) | `npm run dev` |
+| Build de produção (inclui checagem de tipos) | `npm run build` |
+| Servir o build | `npm run start` |
+| Lint (ESLint padrão do Next) | `npm run lint` |
+| Testes | não existem; validar com `npm run build` e `npm run lint` e testar a tela no modo teste |
+| Auditar embeds ambíguos do Supabase | `python3 scripts/audit_embeds.py` (usa `scripts/fk_map.json`) |
+| Deploy | push na branch `main` dispara deploy na Vercel; os crons vêm de `vercel.json` |
+| Disparar cron manualmente | `curl -H "Authorization: Bearer $CRON_SECRET" https://<dominio>/api/cron/backup` e `/api/cron/funil-automacoes` |
+
+Variáveis de ambiente (`.env.local` e painel da Vercel): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (somente servidor, usada pelos crons via `createServiceClient`), `CRON_SECRET`. Nunca expor a service role no cliente nem commitar valores.
+
+Banco: Supabase, projeto `nlhohtbgtiuqyhewbjnu` (`laser-dream-os`, `sa-east-1`). Mudanças de schema são migrações numeradas (última conhecida: 0041). Toda tabela nova precisa de `organization_id`, RLS habilitada e policies que usem `current_organization_id()`, `is_admin()`, `is_manager()` e `current_unit_ids()`.
+
+## 2. Stack
+
+Next.js 14.2.35 (App Router), React 18.3, TypeScript 5.5 em modo estrito, Tailwind 3.4, recharts, @dnd-kit, lucide-react, react-hook-form com zod, date-fns, Supabase (Postgres, Auth, Storage) com `@supabase/ssr` 0.5.1 e `supabase-js` 2.45.4, deploy na Vercel.
+
+## 3. Padrões de código
+
+1. Alias de import `@/` aponta para `src/`.
+2. Textos de interface, mensagens de erro, nomes de papéis e valores de domínio em português; identificadores de banco em `snake_case` e em inglês ou português conforme já existem (ex.: `sale_date`, `valido_ate`, `tipo_venda`). Seguir o nome já usado na tabela, nunca renomear sem atualizar o `ARCHITECTURE.md`.
+3. Páginas em `src/app/(app)/**/page.tsx` são Server Components que leem com `createClient` de `@/lib/supabase/server` e entregam dados a componentes de formulário marcados `"use client"`. Esses componentes gravam com o cliente de navegador (`@/lib/supabase/client`) e chamam `router.refresh()` depois.
+4. Perfil e papel do usuário vêm de `getCurrentProfile()` (`src/lib/current-profile.ts`): `userId`, `organizationId`, `fullName`, `roleName`, `isAdmin`, `isManager`. O papel é comparado pelo nome (`Administrador`, `Gerente`).
+5. Padrão administrador versus solicitação: administrador altera direto; os demais gravam uma linha em `change_requests` (`table_name`, `record_id`, `action`, `payload`, `reason`) e o administrador aprova em `/solicitacoes` (`request-actions.tsx`).
+6. Embeds do PostgREST com mais de uma FK entre as tabelas devem usar o nome da FK (sintaxe `tabela!nome_da_fkey` dentro do `select`); conferir com `scripts/audit_embeds.py`.
+7. Toda consulta de leitura em página deve passar por `unwrap(await consulta, "contexto")` de `src/lib/unwrap.ts`, que lança erro em vez de devolver lista vazia quando a consulta falha (evita tela zerada silenciosa).
+8. Dados de teste: gravar com `is_test` vindo do modo teste (`localStorage` chave `laser_dream_modo_teste`, evento `modo-teste-mudou`); `limpar_dados_de_teste` apaga esses registros.
+9. Dinheiro em `numeric`; datas de venda e caixa em `date`; evitar `new Date().toISOString().slice(0,10)` para "hoje", pois usa UTC (ver risco 9 em `ARCHITECTURE.md` 1.6).
+10. Caixa: dia com `cash_closures` fechado bloqueia INSERT, UPDATE e DELETE em `cash_transactions` (trigger `trg_block_closed_day`).
+11. Rotas de cron validam `Authorization: Bearer CRON_SECRET` e usam a organização fixa `00000000-0000-0000-0000-000000000001`.
+12. Não criar migração, trigger ou função que repita efeito já existente. Antes de mexer em venda ou caixa, ler os triggers de `sales` e `cash_transactions` em `ARCHITECTURE.md` 1.2.4 e o risco 3 de 1.6.
+
+## 4. Papéis
+
+`Administrador` (tudo), `Gerente` (visão da organização, caixa das suas unidades, catálogos), qualquer outro papel (vendas das suas unidades; edição e exclusão via `change_requests`).
+
+## 5. Banco de dados: referência rápida (41 tabelas, schema `public`)
+
+Formato: coluna→tabela indica chave estrangeira. `organization_id` aparece em quase todas e aponta para `organizations`. Dicionário completo (tipos, obrigatoriedade, defaults, RLS, índices) em `ARCHITECTURE.md` 1.2.
+
+| Tabela | PK | Colunas |
+|---|---|---|
+| `backups` | `id` | `id`, `organization_id`, `storage_path`, `size_bytes`, `kind`, `created_by`→profiles, `created_at` |
+| `budget_item_areas` | `budget_item_id,area_id` | `budget_item_id`→budget_items, `area_id`→procedure_areas |
+| `budget_items` | `id` | `id`, `budget_id`→budgets, `procedure_id`→procedures, `amount`, `position` |
+| `budgets` | `id` | `id`, `organization_id`, `client_id`→clients, `opportunity_id`→opportunities, `seller_id`→sellers, `payment_method_id`→payment_methods, `desconto_valor`, `desconto_percentual`, `status`, `loss_reason_id`→loss_reasons, `notes`, `created_by`→profiles, `created_at`, `updated_at`, `valido_ate`, `is_test` |
+| `cash_categories` | `id` | `id`, `organization_id`, `name`, `type`, `active` |
+| `cash_closures` | `id` | `id`, `organization_id`, `unit_id`→units, `closure_date`, `opening_balance`, `total_in`, `total_out`, `closing_balance`, `closed_by`→profiles, `closed_at`, `reopened` |
+| `cash_transactions` | `id` | `id`, `organization_id`, `unit_id`→units, `type`, `transaction_date`, `description`, `category_id`→cash_categories, `amount`, `responsible_id`→profiles, `sale_id`→sales, `receipt_url`, `created_by`→profiles, `created_at` |
+| `change_requests` | `id` | `id`, `organization_id`, `table_name`, `record_id`, `record_label`, `action`, `payload`, `reason`, `status`, `requested_by`→profiles, `requested_at`, `resolved_by`→profiles, `resolved_at` |
+| `client_merge_log` | `id` | `id`, `organization_id`, `kept_client_id`→clients, `absorbed_client_id`, `absorbed_snapshot`, `sales_moved`, `merged_by`→profiles, `merged_at` |
+| `clients` | `id` | `id`, `organization_id`, `name`, `phone`, `email`, `created_at`, `birth_date`, `cpf`, `cep`, `logradouro`, `numero`, `complemento`, `bairro`, `cidade`, `uf`, `created_by`→profiles |
+| `cpf_import_staging` | `id` | `id`, `organization_id`, `linha`, `cpf`, `nome`, `telefone`, `data_nascimento`, `cep`, `logradouro`, `numero`, `complemento`, `bairro`, `cidade`, `uf`, `match_client_id`→clients, `match_tipo`, `match_score`, `match_detalhe`, `aplicado`, `created_at` |
+| `duplicate_flags` | `id` | `id`, `organization_id`, `kind`, `record_a`, `record_b`, `similarity`, `detail`, `status`, `resolved_by`→profiles, `resolved_at`, `created_at` |
+| `funnels` | `id` | `id`, `organization_id`, `name`, `position`, `active`, `created_at` |
+| `invites` | `id` | `id`, `organization_id`, `email`, `role_id`→roles, `unit_id`→units, `token`, `status`, `expires_at`, `created_by`→profiles, `created_at` |
+| `lead_origins` | `id` | `id`, `organization_id`, `name`, `code`, `active`, `created_at` |
+| `loss_reasons` | `id` | `id`, `organization_id`, `name`, `active` |
+| `opportunities` | `id` | `id`, `organization_id`, `unit_id`→units, `client_id`→clients, `stage_id`→pipeline_stages, `seller_id`→sellers, `lead_origin_id`→lead_origins, `estimated_value`, `notes`, `loss_reason_id`→loss_reasons, `sale_id`→sales, `created_by`→profiles, `created_at`, `updated_at`, `referred_by_name`, `interesse_procedure_id`→procedures, `data_avaliacao`, `is_test` |
+| `opportunity_areas` | `opportunity_id,area_id` | `opportunity_id`→opportunities, `area_id`→procedure_areas |
+| `opportunity_events` | `id` | `id`, `opportunity_id`→opportunities, `from_stage_id`→pipeline_stages, `to_stage_id`→pipeline_stages, `changed_by`→profiles, `created_at` |
+| `opportunity_interest_areas` | `opportunity_id,area_id` | `opportunity_id`→opportunities, `area_id`→procedure_areas |
+| `opportunity_notes` | `id` | `id`, `organization_id`, `opportunity_id`→opportunities, `author_id`→profiles, `content`, `created_at` |
+| `opportunity_tags` | `opportunity_id,tag_id` | `opportunity_id`→opportunities, `tag_id`→tags |
+| `opportunity_tasks` | `id` | `id`, `organization_id`, `opportunity_id`→opportunities, `title`, `due_date`, `done`, `assigned_to`→sellers, `created_by`→profiles, `created_at`, `auto_rule` |
+| `org_settings` | `organization_id` | `organization_id`, `radar_retorno_min`, `radar_retorno_max`, `radar_risco_dias`, `radar_frio_dias`, `radar_ativo_dias`, `recorrente_alerta`, `recorrente_limite`, `ticket_atencao`, `ticket_meta`, `updated_at`, `tier_prata`, `tier_ouro`, `tier_diamante`, `duplicate_client_threshold`, `senha_exclusao_permanente` |
+| `organizations` | `id` | `id`, `name`, `created_at` |
+| `packages` | `id` | `id`, `organization_id`, `procedure_id`→procedures, `name`, `description`, `active` |
+| `payment_methods` | `id` | `id`, `organization_id`, `name`, `code`, `active`, `created_at` |
+| `pipeline_stages` | `id` | `id`, `organization_id`, `name`, `position`, `is_won`, `is_lost`, `created_at`, `funnel_id`→funnels |
+| `procedure_areas` | `id` | `id`, `organization_id`, `segment`, `procedure_id`→procedures, `group_label`, `name`, `active` |
+| `procedures` | `id` | `id`, `organization_id`, `name`, `category`, `active`, `segment` |
+| `profiles` | `id` | `id`→users, `organization_id`, `role_id`→roles, `primary_unit_id`→units, `full_name`, `phone`, `active`, `created_at` |
+| `role_permissions` | `id` | `id`, `role_id`→roles, `module`, `action`, `allowed` |
+| `roles` | `id` | `id`, `organization_id`, `name`, `created_at` |
+| `sale_areas` | `sale_id,area_id` | `sale_id`→sales, `area_id`→procedure_areas |
+| `sales` | `id` | `id`, `organization_id`, `unit_id`→units, `sale_date`, `client_id`→clients, `procedure_id`→procedures, `package_id`→packages, `amount`, `installments`, `seller_id`→sellers, `notes`, `status`, `created_by`→profiles, `created_at`, `updated_by`→profiles, `updated_at`, `transaction_code`, `classificacao_financeira`, `tipo_venda`, `payment_method_id`→payment_methods, `lead_origin_id`→lead_origins, `co_seller_id`→sellers, `opportunity_id`→opportunities |
+| `sales_history` | `id` | `id`, `sale_id`→sales, `changed_by`→profiles, `changed_at`, `field_name`, `old_value`, `new_value` |
+| `seller_pairs` | `seller_id,partner_id` | `seller_id`→sellers, `partner_id`→sellers |
+| `sellers` | `id` | `id`, `organization_id`, `unit_id`→units, `name`, `active`, `created_at` |
+| `tags` | `id` | `id`, `organization_id`, `name`, `color`, `created_at` |
+| `units` | `id` | `id`, `organization_id`, `name`, `city`, `active`, `created_at` |
+| `user_units` | `user_id,unit_id` | `user_id`→profiles, `unit_id`→units |
+
+View: `client_intelligence` (`security_invoker`, uma linha por cliente e unidade, com buckets e tiers do Radar). Bucket de Storage privado: `backups`.
+
+## 6. Funções, RPCs e triggers
+
+RPCs chamadas pela aplicação: `get_invite_by_token`, `buscar_clientes_parecidos`, `scan_duplicates`, `merge_clients`, `permanent_delete_sale`, `limpar_dados_de_teste`, `restore_from_backup`.
+
+Funções de apoio a RLS: `current_organization_id`, `current_unit_ids`, `is_admin`, `is_manager`. Outras: `is_valid_cpf`, `classify_cpf_import`, `apply_cpf_import`, `avancar_followup`, `fn_block_closed_day`, `fn_handle_new_user`, `fn_sale_cash_sync`, `fn_sales_audit`, `fn_sales_classify`, `lancar_entrada_caixa_venda`, `reverter_entrada_caixa_venda_cancelada`.
+
+Triggers: `trg_sales_classify` (BEFORE INSERT em `sales`), `trg_sales_audit` (AFTER UPDATE em `sales`), `trg_sale_cash_sync` (AFTER INSERT e UPDATE em `sales`), `trg_lancar_entrada_caixa_venda` (AFTER INSERT em `sales`), `trg_reverter_entrada_caixa_venda_cancelada` (AFTER UPDATE em `sales`), `trg_block_closed_day` (BEFORE INSERT, UPDATE e DELETE em `cash_transactions`), `trg_avancar_followup` (AFTER UPDATE em `opportunity_tasks`), `trg_handle_new_user` (AFTER INSERT em `auth.users`).
+
+## 7. Rotas de API e crons
+
+| Rota | Acesso | Função |
+|---|---|---|
+| `POST /api/backup/generate` | Administrador | Backup manual |
+| `GET /api/backup/list` | Administrador | Lista backups com URL assinada |
+| `POST /api/backup/restore` | Administrador | Restaura (exige `confirm = "RESTAURAR"`, faz backup de segurança antes) |
+| `GET /api/cron/backup` | Bearer `CRON_SECRET` | Backup diário às 06:00 UTC, retenção de 30 dias |
+| `GET /api/cron/funil-automacoes` | Bearer `CRON_SECRET` | Tarefas e etiquetas do funil e expiração de orçamentos, 09:00 UTC |
+| `GET /api/relatorios/vendas`, `clientes-completo`, `clientes-procedimentos`, `radar` | Administrador | Exportações CSV |
+
+## 8. Telas
+
+`/login`, `/convite/[token]`, `/dashboard`, `/vendas`, `/vendas/novo`, `/caixa`, `/clientes`, `/clientes/[id]`, `/funil`, `/orcamentos`, `/orcamentos/novo`, `/orcamentos/[id]`, `/radar`, `/relatorios`, `/relatorios/funil`, `/solicitacoes`, `/usuarios`, `/configuracoes`. Regras de cada uma em `ARCHITECTURE.md` 1.3.
+
+## 9. Pontos de atenção atuais
+
+Resumo dos riscos de `ARCHITECTURE.md` 1.6: (1) não existe backup salvo em lugar algum; (2) `buildBackupPayload` não pagina e pode truncar em 1.000 linhas por tabela; (3) venda em dinheiro dispara dois triggers que inserem entrada de caixa; (4) organização fixa no código; (5) funções `SECURITY DEFINER` executáveis por `anon`. Não restaurar backup sem conferir a contagem de linhas por tabela.
+
+## 10. Como manter este arquivo
+
+Ao criar, editar ou remover tabela, coluna, função, trigger, rota ou funcionalidade: atualizar a seção correspondente de `ARCHITECTURE.md` (1.2 dicionário, 1.3 funcionalidades, 1.4 matriz, 1.5 integrações), atualizar a tabela da seção 5 e as listas das seções 6 a 8 deste arquivo, e commitar tudo junto.
