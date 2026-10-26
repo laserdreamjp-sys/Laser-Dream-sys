@@ -183,3 +183,15 @@ O agente principal deve executar ou intervir diretamente quando:
 2. Não aceitar entrega que não foi verificada.
 3. Não declarar uma tarefa concluída sem ter confirmado que o resultado final cumpre o que foi pedido.
 4. Manter a documentação (`ARCHITECTURE.md` e `CLAUDE.md`) atualizada no mesmo commit, independentemente de quem executou a alteração.
+
+## 12. Ações no Supabase que o usuário precisa executar
+
+Sempre que uma ação no Supabase depender do usuário (rodar SQL, aplicar migração, ajustar configuração), o agente publica um artefato de página única em português, legível no celular, com:
+
+1. Link direto para o SQL Editor do projeto com consulta nova: `https://supabase.com/dashboard/project/nlhohtbgtiuqyhewbjnu/sql/new` (outras telas do painel também por link direto).
+2. Passos numerados e curtos, com o resultado esperado de cada um (por exemplo, `Success. No rows returned`).
+3. Um bloco de código por script, numerado, com botão "Copiar SQL N", para rodar um de cada vez e na ordem indicada. Avisar quando o Supabase pedir confirmação por causa de `drop`.
+4. Uma consulta de conferência somente de leitura, com botão de copiar e a tabela dos valores esperados.
+5. A instrução de parar no primeiro erro e enviar a mensagem exata.
+
+Migrações continuam salvas em `supabase/migrations/NNNN_nome.sql` e documentadas em `ARCHITECTURE.md`; o artefato é só o meio de entrega ao usuário. Depois que o usuário confirmar, o agente confere o resultado no banco antes de dar a ação por concluída.
