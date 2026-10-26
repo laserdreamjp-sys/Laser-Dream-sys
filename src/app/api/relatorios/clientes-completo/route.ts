@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
 import { formatCpf } from "@/lib/cpf";
+import { buscarTodas } from "@/lib/buscar-todas";
+import { hojeLocal } from "@/lib/datas";
 
 type Row = {
   sale_date: string;
@@ -43,15 +45,22 @@ export async function GET() {
     );
   }
 
-  const { data, error } = await supabase
-    .from("sales")
-    .select(
-      "sale_date, amount, status, installments, procedures(name, segment), payment_methods(name), sellers!sales_seller_id_fkey(name), sale_areas(procedure_areas(name)), clients(name, cpf, phone, email, cep, logradouro, numero, complemento, bairro, cidade, uf)"
-    )
-    .order("sale_date", { ascending: false });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  let data: unknown[];
+  try {
+    data = await buscarTodas(
+      (de, ate) =>
+        supabase
+          .from("sales")
+          .select(
+            "sale_date, amount, status, installments, procedures(name, segment), payment_methods(name), sellers!sales_seller_id_fkey(name), sale_areas(procedure_areas(name)), clients(name, cpf, phone, email, cep, logradouro, numero, complemento, bairro, cidade, uf)"
+          )
+          .order("sale_date", { ascending: false })
+          .order("id")
+          .range(de, ate),
+      "as vendas"
+    );
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 400 });
   }
 
   const rows = (data ?? []) as unknown as Row[];
@@ -95,7 +104,7 @@ export async function GET() {
   return new NextResponse(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="clientes-completo-${new Date().toISOString().slice(0, 10)}.csv"`,
+      "Content-Disposition": `attachment; filename="clientes-completo-${hojeLocal()}.csv"`,
     },
   });
 }

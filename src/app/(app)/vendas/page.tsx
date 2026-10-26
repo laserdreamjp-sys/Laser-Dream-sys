@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
+import { mesAtualLocal } from "@/lib/datas";
 import { SaleRowActions } from "@/components/sale-row-actions";
 import { MonthSwitcher } from "@/components/month-switcher";
 import { ColumnFilter } from "@/components/column-filter";
@@ -19,8 +20,7 @@ function formatDateTime(value: string) {
 }
 
 function currentMonthStr() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return mesAtualLocal();
 }
 
 function monthBounds(monthStr: string) {

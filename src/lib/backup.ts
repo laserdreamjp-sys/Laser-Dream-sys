@@ -80,7 +80,8 @@ async function countRows(supabase: SupabaseClient, table: BackupTable): Promise<
 
 async function readAllRows(supabase: SupabaseClient, table: BackupTable): Promise<unknown[]> {
   const rows: unknown[] = [];
-  for (let from = 0; ; from += PAGE_SIZE) {
+  for (;;) {
+    const from = rows.length;
     let query = supabase.from(table).select("*");
     for (const column of ORDER_COLUMNS[table]) {
       query = query.order(column, { ascending: true });
@@ -90,10 +91,10 @@ async function readAllRows(supabase: SupabaseClient, table: BackupTable): Promis
       throw new Error(`Falha ao ler a tabela ${table} (linhas a partir de ${from}): ${error.message}`);
     }
     const page = data ?? [];
-    rows.push(...page);
-    // Para só quando um lote volta vazio: assim um limite de servidor menor
-    // que PAGE_SIZE não encerra a leitura antes da hora.
+    // Avança pelo que veio e para só no lote vazio: se o servidor tiver um
+    // limite menor que PAGE_SIZE, nenhuma linha é pulada.
     if (page.length === 0) break;
+    rows.push(...page);
   }
   return rows;
 }

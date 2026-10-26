@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { hojeLocal } from "@/lib/datas";
 import { ClientAutocomplete } from "@/components/client-autocomplete";
 
 type Option = { id: string; name: string };
@@ -41,7 +42,7 @@ export function NewSaleForm({
   const router = useRouter();
   const supabase = createClient();
 
-  const [saleDate, setSaleDate] = useState(new Date().toISOString().slice(0, 10));
+  const [saleDate, setSaleDate] = useState(hojeLocal());
   const [unitId, setUnitId] = useState(units[0]?.id ?? "");
   const [clientId, setClientId] = useState(initialClientId ?? "");
   const [clienteCpf, setClienteCpf] = useState("");

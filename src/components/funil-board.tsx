@@ -16,6 +16,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { createClient } from "@/lib/supabase/client";
+import { hojeLocal } from "@/lib/datas";
 import { LeadDetailModal } from "@/components/lead-detail-modal";
 
 type Stage = { id: string; name: string; position: number; is_won: boolean; is_lost: boolean };
@@ -226,7 +227,7 @@ export function FunilBoard({
 
   const activeOpportunity = activeId ? items.find((o) => o.id === activeId) : null;
   const openOpportunity = openId ? items.find((o) => o.id === openId) : null;
-  const hoje = new Date().toISOString().slice(0, 10);
+  const hoje = hojeLocal();
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>

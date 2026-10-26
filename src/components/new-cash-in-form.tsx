@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { hojeLocal } from "@/lib/datas";
 
 type Option = { id: string; name: string };
 
@@ -24,7 +25,7 @@ export function NewCashInForm({
   const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [amount, setAmount] = useState("");
-  const [transactionDate, setTransactionDate] = useState(new Date().toISOString().slice(0, 10));
+  const [transactionDate, setTransactionDate] = useState(hojeLocal());
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

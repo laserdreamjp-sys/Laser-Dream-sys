@@ -136,9 +136,11 @@ laser-dream-os/
     ├── types/database.ts
     ├── lib/
     │   ├── backup.ts
+    │   ├── buscar-todas.ts
     │   ├── change-request-labels.ts
     │   ├── cpf.ts
     │   ├── current-profile.ts
+    │   ├── datas.ts
     │   ├── unwrap.ts
     │   └── supabase/{client.ts, server.ts, service.ts}
     ├── components/            (32 arquivos, listados abaixo)
@@ -183,6 +185,8 @@ laser-dream-os/
 | `supabase/service.ts` | `createServiceClient()` com a service role; devolve `null` se a variável não existir. Só para cron |
 | `current-profile.ts` | `getCurrentProfile()` devolve `userId`, `organizationId`, `fullName`, `roleName`, `isAdmin`, `isManager` |
 | `unwrap.ts` | `unwrap<T>()` lança erro quando a consulta Supabase retorna `error` |
+| `buscar-todas.ts` | `buscarTodas(consulta, contexto)`: lê todas as linhas em lotes de 1.000 (`TAMANHO_DO_LOTE`), avançando pelo que veio e parando no lote vazio; lança erro em vez de devolver lista parcial. A consulta recebe `(de, ate)`, precisa de ordem estável terminando em coluna única e de `.range(de, ate)`. Usado no Radar, no Dashboard (contagem do Radar e totais de caixa) e nas 4 exportações CSV |
+| `datas.ts` | Datas no fuso `America/Sao_Paulo`: `hojeLocal()`, `dataLocal(instante)`, `somarDias(data, n)`, `mesAtualLocal()`, `primeiroDiaDoMesLocal()`. Substitui `toISOString().slice(0,10)`, que dá a data em UTC |
 | `cpf.ts` | `normalizeCpf` (só dígitos), `formatCpf` (000.000.000-00), `maskCpf` (oculta dígitos), `isValidCpf` (dígitos verificadores) e a lista `UFS` |
 | `backup.ts` | `BACKUP_TABLES`, tipo `BackupPayload`, `buildBackupPayload()`, `RESTORE_DELETE_ORDER` e `RESTORE_INSERT_ORDER`. `buildBackupPayload` conta cada tabela (`count: "exact"`), lê em lotes de 1.000 linhas com `.range()` ordenando pela chave primária até um lote voltar vazio, grava `counts` no JSON e lança erro (nada é salvo) se alguma tabela vier com menos linhas que a contagem |
 | `change-request-labels.ts` | `TABLE_LABELS` (nome amigável por tabela) e o tipo `ChangeRequest` |
@@ -2163,10 +2167,11 @@ Levantamento feito comparando o código com o banco real (projeto `nlhohtbgtiuqy
 | 6 | Média | Proteção contra senha vazada desativada | Aviso `leaked password protection` no Auth | Ativar em Authentication > Policies |
 | 7 | Média | Extensões `pg_trgm` e `unaccent` no schema `public` | Aviso `extension_in_public` | Mover para o schema `extensions` em janela de manutenção, conferindo se `buscar_clientes_parecidos` e `scan_duplicates` referenciam o schema |
 | 8 | Média | CPF gravado sem normalização no formulário de venda | `new-sale-form.tsx` grava `cpf: clienteCpf.trim()` | Normalizar para somente dígitos antes de gravar e validar com `is_valid_cpf` |
-| 9 | Média | Data de hoje em UTC | `caixa/page.tsx` usa `new Date().toISOString().slice(0,10)`; os crons também usam UTC | Após as 21h em São Paulo o "hoje" já é o dia seguinte; usar `America/Sao_Paulo` |
+| 9 | Média (resolvido no código) | Data de hoje em UTC | Formulários de venda, caixa e orçamento, telas de caixa, vendas, dashboard e funil e o cron `funil-automacoes` usavam `toISOString().slice(0,10)`: depois das 21h em São Paulo o "hoje" virava o dia seguinte, e a avaliação marcada depois das 21h não gerava a tarefa de confirmação | **Corrigido:** tudo passa por `src/lib/datas.ts` (fuso `America/Sao_Paulo`), inclusive a data da avaliação no cron. Pendente: `permanent_delete_sale` e outras funções do banco ainda usam `current_date` (UTC) |
 | 10 | Média | Aprovação de solicitações aplicada no cliente | `request-actions.tsx` executa as alterações no navegador do administrador | Mover para uma RPC transacional para evitar aprovação parcial |
 | 11 | Baixa | Tipos do banco desatualizados | `src/types/database.ts` não reflete as 41 tabelas e a view | Regenerar com `supabase gen types typescript` e fixar no repositório |
 | 12 | Baixa | Estruturas sem uso | `organizations`, `role_permissions`, `packages` sem código; `orcamentos` com status `convertido` e `perdido` que nenhum código grava | Decidir entre implementar ou remover |
 | 13 | Baixa | Sem testes automatizados e sem integração Git no Supabase | Nenhum script de teste; migrações 0001 a 0041 não versionadas no repositório; a partir da 0042 os arquivos ficam em `supabase/migrations/` (0042: entrada de caixa única por venda; 0043: remove o trigger reverter) | Exportar as migrações 0001 a 0041 para `supabase/migrations/` e criar ao menos testes das regras de caixa e de classificação de venda |
+| 14 | Crítica (resolvido no código) | Listas cortadas em 1.000 linhas sem aviso | O Supabase devolve no máximo 1.000 linhas por resposta. `client_intelligence` tem 4.672 linhas e `sales` 1.686: o Radar mostrava só os 1.000 clientes de maior valor, a contagem do Radar no Dashboard saía errada e as exportações CSV (`vendas`, `clientes-procedimentos`, `clientes-completo`, `radar`) vinham incompletas | **Corrigido:** essas leituras usam `buscarTodas` (`src/lib/buscar-todas.ts`). Regra: lista que pode passar de 1.000 linhas usa `buscarTodas`. Prática trazida da Harmonize |
 
 **Recomendação.** Executar os itens 1 e 2 antes de qualquer outra mudança: hoje uma falha no banco significa perda total de dados, e o backup atual, mesmo quando existir, pode não conter todos os registros. Em seguida, tratar o item 3 (risco financeiro de lançamento duplicado) e o item 5.

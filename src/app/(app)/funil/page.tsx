@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
+import { hojeLocal } from "@/lib/datas";
 import { FunilBoard } from "@/components/funil-board";
 import { NewOpportunityButton } from "@/components/new-opportunity-button";
 import { FunilUserFilter } from "@/components/funil-user-filter";
@@ -62,7 +63,7 @@ export default async function FunilPage({
   }
 
   if (soAtrasadas) {
-    const hojeStr = new Date().toISOString().slice(0, 10);
+    const hojeStr = hojeLocal();
     const { data } = await supabase
       .from("opportunity_tasks")
       .select("opportunity_id")

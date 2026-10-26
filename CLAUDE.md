@@ -36,10 +36,11 @@ Next.js 14.2.35 (App Router), React 18.3, TypeScript 5.5 em modo estrito, Tailwi
 6. Embeds do PostgREST com mais de uma FK entre as tabelas devem usar o nome da FK (sintaxe `tabela!nome_da_fkey` dentro do `select`); conferir com `scripts/audit_embeds.py`.
 7. Toda consulta de leitura em página deve passar por `unwrap(await consulta, "contexto")` de `src/lib/unwrap.ts`, que lança erro em vez de devolver lista vazia quando a consulta falha (evita tela zerada silenciosa).
 8. Dados de teste: gravar com `is_test` vindo do modo teste (`localStorage` chave `laser_dream_modo_teste`, evento `modo-teste-mudou`); `limpar_dados_de_teste` apaga esses registros.
-9. Dinheiro em `numeric`; datas de venda e caixa em `date`; evitar `new Date().toISOString().slice(0,10)` para "hoje", pois usa UTC (ver risco 9 em `ARCHITECTURE.md` 1.6).
-10. Caixa: dia com `cash_closures` fechado bloqueia INSERT, UPDATE e DELETE em `cash_transactions` (trigger `trg_block_closed_day`).
-11. Rotas de cron validam `Authorization: Bearer CRON_SECRET` e usam a organização fixa `00000000-0000-0000-0000-000000000001`.
-12. Não criar migração, trigger ou função que repita efeito já existente. Antes de mexer em venda ou caixa, ler os triggers de `sales` e `cash_transactions` em `ARCHITECTURE.md` 1.2.4 e o risco 3 de 1.6.
+9. Dinheiro em `numeric`; datas de venda e caixa em `date`. "Hoje", "amanhã" e o mês corrente sempre por `hojeLocal`, `somarDias`, `mesAtualLocal`, `primeiroDiaDoMesLocal` e `dataLocal` de `src/lib/datas.ts` (fuso de Brasília); nunca `toISOString().slice(0,10)`, que dá a data em UTC.
+10. Lista que pode passar de 1.000 linhas (clientes, vendas, `client_intelligence`, áreas de venda, caixa, exportações) usa `buscarTodas` de `src/lib/buscar-todas.ts`, com ordem estável terminando em coluna única. O Supabase corta em 1.000 sem erro.
+11. Caixa: dia com `cash_closures` fechado bloqueia INSERT, UPDATE e DELETE em `cash_transactions` (trigger `trg_block_closed_day`).
+12. Rotas de cron validam `Authorization: Bearer CRON_SECRET` e usam a organização fixa `00000000-0000-0000-0000-000000000001`.
+13. Não criar migração, trigger ou função que repita efeito já existente. Antes de mexer em venda ou caixa, ler os triggers de `sales` e `cash_transactions` em `ARCHITECTURE.md` 1.2.4 e o risco 3 de 1.6.
 
 ## 4. Papéis
 
@@ -120,7 +121,7 @@ Triggers: `trg_sales_classify` (BEFORE INSERT em `sales`), `trg_sales_audit` (AF
 
 ## 9. Pontos de atenção atuais
 
-Resumo dos riscos de `ARCHITECTURE.md` 1.6: (1) não existe backup salvo em lugar algum; (2) resolvido: `buildBackupPayload` pagina, grava `counts` (formato `version: 2`) e falha se faltar linha, mas backups `version: 1` podem estar truncados; (3) resolvido na 0042: um só trigger lança a entrada de caixa da venda; (4) organização fixa no código; (5) funções `SECURITY DEFINER` executáveis por `anon`. A restauração recusa backup `version: 1` e backup cujo `counts` não bata com `tables`.
+Resumo dos riscos de `ARCHITECTURE.md` 1.6: (1) não existe backup salvo em lugar algum; (2) resolvido: `buildBackupPayload` pagina, grava `counts` (formato `version: 2`) e falha se faltar linha, mas backups `version: 1` podem estar truncados; (3) resolvido na 0042: um só trigger lança a entrada de caixa da venda; (4) organização fixa no código; (5) funções `SECURITY DEFINER` executáveis por `anon`; (9) resolvido: datas no fuso de Brasília; (14) resolvido: listas grandes paginadas com `buscarTodas`. A restauração recusa backup `version: 1` e backup cujo `counts` não bata com `tables`.
 
 ## 10. Como manter este arquivo
 

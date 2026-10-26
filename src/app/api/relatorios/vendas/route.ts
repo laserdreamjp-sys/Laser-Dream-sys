@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
+import { buscarTodas } from "@/lib/buscar-todas";
 
 function csvEscape(value: unknown) {
   const str = String(value ?? "");
@@ -19,14 +20,6 @@ export async function GET(request: NextRequest) {
   }
   const { searchParams } = new URL(request.url);
 
-  let query = supabase
-    .from("sales")
-    .select(
-      "sale_date, amount, status, tipo_venda, classificacao_financeira, transaction_code, notes, clients(name), sellers!sales_seller_id_fkey(name), procedures(name, segment), payment_methods(name), profiles!sales_created_by_fkey(full_name), created_at"
-    )
-    .order("sale_date", { ascending: false })
-    .limit(2000);
-
   const de = searchParams.get("de");
   const ate = searchParams.get("ate");
   const procedimento = searchParams.get("procedimento");
@@ -36,18 +29,27 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get("status");
   const segmento = searchParams.get("segmento");
 
-  if (de) query = query.gte("sale_date", de);
-  if (ate) query = query.lte("sale_date", ate);
-  if (procedimento) query = query.eq("procedure_id", procedimento);
-  if (vendedor) query = query.eq("seller_id", vendedor);
-  if (pagamento) query = query.eq("payment_method_id", pagamento);
-  if (tipo) query = query.eq("tipo_venda", tipo);
-  if (status) query = query.eq("status", status);
+  function montarConsulta(inicio: number, fim: number) {
+    let query = supabase
+      .from("sales")
+      .select(
+        "sale_date, amount, status, tipo_venda, classificacao_financeira, transaction_code, notes, clients(name), sellers!sales_seller_id_fkey(name), procedures(name, segment), payment_methods(name), profiles!sales_created_by_fkey(full_name), created_at"
+      );
+    if (de) query = query.gte("sale_date", de);
+    if (ate) query = query.lte("sale_date", ate);
+    if (procedimento) query = query.eq("procedure_id", procedimento);
+    if (vendedor) query = query.eq("seller_id", vendedor);
+    if (pagamento) query = query.eq("payment_method_id", pagamento);
+    if (tipo) query = query.eq("tipo_venda", tipo);
+    if (status) query = query.eq("status", status);
+    return query.order("sale_date", { ascending: false }).order("id").range(inicio, fim);
+  }
 
-  const { data, error } = await query;
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  let data: unknown[];
+  try {
+    data = await buscarTodas(montarConsulta, "as vendas");
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 400 });
   }
 
   type Row = {

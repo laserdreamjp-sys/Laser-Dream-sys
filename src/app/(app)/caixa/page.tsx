@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
+import { hojeLocal } from "@/lib/datas";
 import { NewCashOutForm } from "@/components/new-cash-out-form";
 import { NewCashInForm } from "@/components/new-cash-in-form";
 import { CloseRegisterForm, type ExistingClosure } from "@/components/close-register-form";
@@ -15,7 +16,7 @@ function formatDate(value: string) {
 export default async function CaixaPage() {
   const supabase = createClient();
   const profile = await getCurrentProfile();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = hojeLocal();
 
   const unitsRes = await supabase.from("units").select("id, name").eq("active", true).order("name");
   const units = unitsRes.data ?? [];

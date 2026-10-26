@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
+import { buscarTodas } from "@/lib/buscar-todas";
 
 function csvEscape(value: unknown) {
   const str = String(value ?? "");
@@ -18,14 +19,21 @@ export async function GET() {
     return NextResponse.json({ error: "Apenas o administrador pode exportar relatórios." }, { status: 403 });
   }
 
-  const { data, error } = await supabase
-    .from("sales")
-    .select("sale_date, amount, clients(name), procedures(name, segment)")
-    .eq("status", "ativa")
-    .order("sale_date", { ascending: false });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  let data: unknown[];
+  try {
+    data = await buscarTodas(
+      (de, ate) =>
+        supabase
+          .from("sales")
+          .select("sale_date, amount, clients(name), procedures(name, segment)")
+          .eq("status", "ativa")
+          .order("sale_date", { ascending: false })
+          .order("id")
+          .range(de, ate),
+      "as vendas"
+    );
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 400 });
   }
 
   type Row = {

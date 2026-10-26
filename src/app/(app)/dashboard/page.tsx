@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { SegmentChart, PaymentMethodChart, RecorrenteAlert } from "@/components/dashboard-charts";
+import { buscarTodas } from "@/lib/buscar-todas";
+import { primeiroDiaDoMesLocal } from "@/lib/datas";
 
 function formatCurrency(value: number) {
   return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -9,9 +11,7 @@ function formatCurrency(value: number) {
 export default async function DashboardPage() {
   const supabase = createClient();
 
-  const firstDayOfMonth = new Date();
-  firstDayOfMonth.setDate(1);
-  const isoFirstDay = firstDayOfMonth.toISOString().slice(0, 10);
+  const isoFirstDay = primeiroDiaDoMesLocal();
 
   const salesRes = await supabase
     .from("sales")
@@ -20,8 +20,14 @@ export default async function DashboardPage() {
     )
     .eq("status", "ativa")
     .gte("sale_date", isoFirstDay);
-  const cashInRes = await supabase.from("cash_transactions").select("amount").eq("type", "entrada");
-  const cashOutRes = await supabase.from("cash_transactions").select("amount").eq("type", "saida");
+  const cashInRows = await buscarTodas<{ amount: number }>(
+    (de, ate) => supabase.from("cash_transactions").select("amount").eq("type", "entrada").order("id").range(de, ate),
+    "as entradas de caixa"
+  );
+  const cashOutRows = await buscarTodas<{ amount: number }>(
+    (de, ate) => supabase.from("cash_transactions").select("amount").eq("type", "saida").order("id").range(de, ate),
+    "as saídas de caixa"
+  );
 
   type SaleAgg = {
     amount: number;
@@ -43,8 +49,8 @@ export default async function DashboardPage() {
       </div>
     );
   }
-  const cashIn: { amount: number }[] = cashInRes.data ?? [];
-  const cashOut: { amount: number }[] = cashOutRes.data ?? [];
+  const cashIn: { amount: number }[] = cashInRows;
+  const cashOut: { amount: number }[] = cashOutRows;
 
   const faturamento = sales.reduce((acc, s) => acc + Number(s.amount), 0);
   const numeroVendas = sales.length;
@@ -145,10 +151,14 @@ export default async function DashboardPage() {
     recorrente_alerta: 37, recorrente_limite: 40, ticket_atencao: 650, ticket_meta: 850,
   }) as { recorrente_alerta: number; recorrente_limite: number; ticket_atencao: number; ticket_meta: number };
 
-  const radarRes = await supabase.from("client_intelligence").select("bucket");
+  const radarRows = await buscarTodas<{ bucket: string }>(
+    (de, ate) =>
+      supabase.from("client_intelligence").select("bucket").order("client_id").order("unit_id").range(de, ate),
+    "o radar de clientes"
+  );
   const radarCounts: Record<string, number> = {};
-  for (const row of radarRes.data ?? []) {
-    const key = (row as { bucket: string }).bucket;
+  for (const row of radarRows) {
+    const key = row.bucket;
     radarCounts[key] = (radarCounts[key] ?? 0) + 1;
   }
 
