@@ -21,7 +21,7 @@ Sistema de gestão de clínica (vendas, caixa, clientes, funil comercial, orçam
 
 Variáveis de ambiente (`.env.local` e painel da Vercel): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (somente servidor, usada pelos crons via `createServiceClient`), `CRON_SECRET`. Nunca expor a service role no cliente nem commitar valores.
 
-Banco: Supabase, projeto `nlhohtbgtiuqyhewbjnu` (`laser-dream-os`, `sa-east-1`). Mudanças de schema são migrações numeradas (última: 0043); a partir da 0042 o SQL fica em `supabase/migrations/NNNN_nome.sql` e é aplicado com o mesmo nome no Supabase. Toda tabela nova precisa de `organization_id`, RLS habilitada e policies que usem `current_organization_id()`, `is_admin()`, `is_manager()` e `current_unit_ids()`.
+Banco: Supabase, projeto `nlhohtbgtiuqyhewbjnu` (`laser-dream-os`, `sa-east-1`). Mudanças de schema são migrações numeradas (última: 0044); a partir da 0042 o SQL fica em `supabase/migrations/NNNN_nome.sql` e é aplicado com o mesmo nome no Supabase. Toda tabela nova precisa de `organization_id`, RLS habilitada e policies que usem `current_organization_id()`, `is_admin()`, `is_manager()` e `current_unit_ids()`.
 
 ## 2. Stack
 
@@ -123,7 +123,7 @@ Triggers: `trg_sales_classify` (BEFORE INSERT em `sales`), `trg_sales_audit` (AF
 
 ## 9. Pontos de atenção atuais
 
-Resumo dos riscos de `ARCHITECTURE.md` 1.6: (1) não existe backup salvo em lugar algum; (2) resolvido: `buildBackupPayload` pagina, grava `counts` (formato `version: 2`) e falha se faltar linha, mas backups `version: 1` podem estar truncados; (3) resolvido na 0042: um só trigger lança a entrada de caixa da venda; (4) organização fixa no código; (5) `anon` com privilégios em todas as tabelas: correção na 0044, aguardando aplicação; (9) resolvido: datas no fuso de Brasília; (14) resolvido: listas grandes paginadas com `buscarTodas`. A restauração recusa backup `version: 1` e backup cujo `counts` não bata com `tables`.
+Resumo dos riscos de `ARCHITECTURE.md` 1.6: (1) não existe backup salvo em lugar algum; (2) resolvido: `buildBackupPayload` pagina, grava `counts` (formato `version: 2`) e falha se faltar linha, mas backups `version: 1` podem estar truncados; (3) resolvido na 0042: um só trigger lança a entrada de caixa da venda; (4) organização fixa no código; (5) resolvido na 0044: `anon` sem acesso a tabelas, só `get_invite_by_token` aberta; (9) resolvido: datas no fuso de Brasília; (14) resolvido: listas grandes paginadas com `buscarTodas`. A restauração recusa backup `version: 1` e backup cujo `counts` não bata com `tables`.
 
 ## 10. Como manter este arquivo
 
