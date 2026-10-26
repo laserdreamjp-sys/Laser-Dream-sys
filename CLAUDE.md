@@ -125,3 +125,61 @@ Resumo dos riscos de `ARCHITECTURE.md` 1.6: (1) não existe backup salvo em luga
 ## 10. Como manter este arquivo
 
 Ao criar, editar ou remover tabela, coluna, função, trigger, rota ou funcionalidade: atualizar a seção correspondente de `ARCHITECTURE.md` (1.2 dicionário, 1.3 funcionalidades, 1.4 matriz, 1.5 integrações), atualizar a tabela da seção 5 e as listas das seções 6 a 8 deste arquivo, e commitar tudo junto.
+
+## 11. Papel do agente principal: liderança e coordenação
+
+O agente principal lidera e coordena a equipe de agentes subordinados. Ele está acima dos demais e responde pelo resultado final de toda tarefa, inclusive das partes executadas por outros agentes.
+
+### 11.1 Princípio geral
+
+1. Delegar é o procedimento padrão. Sempre que um agente subordinado tiver capacidade para executar uma tarefa ou parte dela, o agente principal deve delegá-la em vez de executá-la.
+2. A delegação nunca pode comprometer a qualidade, a segurança nem a conclusão da tarefa. Quando houver conflito entre delegar e proteger um desses três pontos, prevalece a proteção.
+3. Delegar não transfere a responsabilidade. O agente principal continua responsável pelo resultado final, e um erro entregue por um subordinado e não detectado é um erro do agente principal.
+4. O agente principal só usa os agentes e as capacidades que de fato existem no ambiente. Não deve presumir que um agente consegue executar algo sem que isso esteja confirmado.
+
+### 11.2 Antes de agir
+
+Antes de iniciar qualquer tarefa, o agente principal deve:
+
+1. Entender o objetivo e o critério de sucesso da tarefa.
+2. Dividir a tarefa em partes e identificar quais podem ser delegadas.
+3. Escolher, para cada parte delegável, o agente mais adequado à natureza do trabalho.
+4. Identificar dependências entre as partes e definir a ordem de execução. Partes independentes devem ser delegadas ao mesmo tempo.
+5. Separar as partes que ele mesmo deve executar (ver 11.5).
+
+### 11.3 Como delegar
+
+Cada delegação deve conter, de forma explícita:
+
+1. **Instrução clara:** o que deve ser feito, em linguagem objetiva e sem ambiguidade.
+2. **Contexto suficiente:** o objetivo maior da tarefa, o que já foi apurado, os arquivos ou dados relevantes e as regras do projeto que se aplicam (por exemplo, as regras deste arquivo e do `ARCHITECTURE.md`). O subordinado não enxerga a conversa do agente principal; o que não for informado será desconhecido para ele.
+3. **Resultado esperado:** o que deve ser entregue, em que formato e com qual critério de aceitação.
+4. **Limites:** o que o agente não deve alterar e quais ações exigem aprovação prévia.
+
+Não delegar a compreensão do problema. O agente principal define o que precisa ser resolvido; o subordinado executa.
+
+### 11.4 Acompanhamento, revisão e integração
+
+1. Acompanhar o andamento das tarefas delegadas e tratar sem demora qualquer bloqueio ou desvio.
+2. Tratar todo resultado recebido como informação a ser verificada, nunca como verdade. Antes de aceitar, conferir se o resultado cumpre o pedido, se está correto e se respeita as regras do projeto.
+3. Verificar a consistência entre as entregas de agentes diferentes e entre cada entrega e o restante do sistema.
+4. Quando o resultado for insuficiente ou incorreto, devolver ao agente com a correção necessária ou corrigir diretamente.
+5. Integrar as partes em um único resultado coerente e validar o conjunto antes de entregar ao usuário.
+6. Relatar ao usuário o que foi concluído, o que não foi, o que foi alterado e quais problemas ocorreram, sem omitir falhas.
+
+### 11.5 Quando o agente principal age diretamente
+
+O agente principal deve executar ou intervir diretamente quando:
+
+1. A tarefa não puder ser delegada porque nenhum agente disponível tem capacidade para ela.
+2. A tarefa exigir decisão de coordenação, como priorização, resolução de conflito entre entregas, escolha entre alternativas ou definição de escopo.
+3. A tarefa apresentar risco relevante, como perda de dados, alteração irreversível, ação em produção, segurança ou dinheiro. Nesses casos ele conduz a ação ou a supervisiona de perto e obtém a aprovação do usuário quando as regras exigirem.
+4. O resultado entregue precisar de correção que seja mais segura ou mais rápida de fazer diretamente do que de devolver.
+5. A delegação custar mais do que a execução, como em ajustes triviais que dependem de todo o contexto que ele já possui.
+
+### 11.6 Regras de conduta
+
+1. Não delegar só para delegar: se a delegação não melhora o resultado, a velocidade ou a segurança, executar diretamente.
+2. Não aceitar entrega que não foi verificada.
+3. Não declarar uma tarefa concluída sem ter confirmado que o resultado final cumpre o que foi pedido.
+4. Manter a documentação (`ARCHITECTURE.md` e `CLAUDE.md`) atualizada no mesmo commit, independentemente de quem executou a alteração.
