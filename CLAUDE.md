@@ -20,7 +20,7 @@ Sistema de gestão de clínica (vendas, caixa, clientes, funil comercial, orçam
 
 Variáveis de ambiente (`.env.local` e painel da Vercel): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (somente servidor, usada pelos crons via `createServiceClient`), `CRON_SECRET`. Nunca expor a service role no cliente nem commitar valores.
 
-Banco: Supabase, projeto `nlhohtbgtiuqyhewbjnu` (`laser-dream-os`, `sa-east-1`). Mudanças de schema são migrações numeradas (última conhecida: 0041). Toda tabela nova precisa de `organization_id`, RLS habilitada e policies que usem `current_organization_id()`, `is_admin()`, `is_manager()` e `current_unit_ids()`.
+Banco: Supabase, projeto `nlhohtbgtiuqyhewbjnu` (`laser-dream-os`, `sa-east-1`). Mudanças de schema são migrações numeradas (última: 0042); a partir da 0042 o SQL fica em `supabase/migrations/NNNN_nome.sql` e é aplicado com o mesmo nome no Supabase. Toda tabela nova precisa de `organization_id`, RLS habilitada e policies que usem `current_organization_id()`, `is_admin()`, `is_manager()` e `current_unit_ids()`.
 
 ## 2. Stack
 
@@ -99,9 +99,9 @@ View: `client_intelligence` (`security_invoker`, uma linha por cliente e unidade
 
 RPCs chamadas pela aplicação: `get_invite_by_token`, `buscar_clientes_parecidos`, `scan_duplicates`, `merge_clients`, `permanent_delete_sale`, `limpar_dados_de_teste`, `restore_from_backup`.
 
-Funções de apoio a RLS: `current_organization_id`, `current_unit_ids`, `is_admin`, `is_manager`. Outras: `is_valid_cpf`, `classify_cpf_import`, `apply_cpf_import`, `avancar_followup`, `fn_block_closed_day`, `fn_handle_new_user`, `fn_sale_cash_sync`, `fn_sales_audit`, `fn_sales_classify`, `lancar_entrada_caixa_venda`, `reverter_entrada_caixa_venda_cancelada`.
+Funções de apoio a RLS: `current_organization_id`, `current_unit_ids`, `is_admin`, `is_manager`. Outras: `is_valid_cpf`, `classify_cpf_import`, `apply_cpf_import`, `avancar_followup`, `fn_block_closed_day`, `fn_handle_new_user`, `fn_sale_cash_sync`, `fn_sales_audit`, `fn_sales_classify`, `reverter_entrada_caixa_venda_cancelada` (sem efeito desde a 0042).
 
-Triggers: `trg_sales_classify` (BEFORE INSERT em `sales`), `trg_sales_audit` (AFTER UPDATE em `sales`), `trg_sale_cash_sync` (AFTER INSERT e UPDATE em `sales`), `trg_lancar_entrada_caixa_venda` (AFTER INSERT em `sales`), `trg_reverter_entrada_caixa_venda_cancelada` (AFTER UPDATE em `sales`), `trg_block_closed_day` (BEFORE INSERT, UPDATE e DELETE em `cash_transactions`), `trg_avancar_followup` (AFTER UPDATE em `opportunity_tasks`), `trg_handle_new_user` (AFTER INSERT em `auth.users`).
+Triggers: `trg_sales_classify` (BEFORE INSERT em `sales`), `trg_sales_audit` (AFTER UPDATE em `sales`), `trg_sale_cash_sync` (AFTER INSERT e UPDATE em `sales`, única origem da entrada de caixa de venda em dinheiro; índice único parcial `uq_cash_transactions_sale_id` garante uma entrada por venda), `trg_reverter_entrada_caixa_venda_cancelada` (AFTER UPDATE em `sales`), `trg_block_closed_day` (BEFORE INSERT, UPDATE e DELETE em `cash_transactions`), `trg_avancar_followup` (AFTER UPDATE em `opportunity_tasks`), `trg_handle_new_user` (AFTER INSERT em `auth.users`).
 
 ## 7. Rotas de API e crons
 
@@ -120,7 +120,7 @@ Triggers: `trg_sales_classify` (BEFORE INSERT em `sales`), `trg_sales_audit` (AF
 
 ## 9. Pontos de atenção atuais
 
-Resumo dos riscos de `ARCHITECTURE.md` 1.6: (1) não existe backup salvo em lugar algum; (2) `buildBackupPayload` não pagina e pode truncar em 1.000 linhas por tabela; (3) venda em dinheiro dispara dois triggers que inserem entrada de caixa; (4) organização fixa no código; (5) funções `SECURITY DEFINER` executáveis por `anon`. Não restaurar backup sem conferir a contagem de linhas por tabela.
+Resumo dos riscos de `ARCHITECTURE.md` 1.6: (1) não existe backup salvo em lugar algum; (2) resolvido: `buildBackupPayload` pagina, grava `counts` (formato `version: 2`) e falha se faltar linha, mas backups `version: 1` podem estar truncados; (3) resolvido na 0042: um só trigger lança a entrada de caixa da venda; (4) organização fixa no código; (5) funções `SECURITY DEFINER` executáveis por `anon`. Não restaurar backup `version: 1` nem backup cujo `counts` não bata com o tamanho de cada lista em `tables`.
 
 ## 10. Como manter este arquivo
 

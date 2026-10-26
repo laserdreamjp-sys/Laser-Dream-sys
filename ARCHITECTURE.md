@@ -129,6 +129,8 @@ laser-dream-os/
 ├── scripts/
 │   ├── audit_embeds.py
 │   └── fk_map.json
+├── supabase/
+│   └── migrations/        (a partir da 0042; 0001 a 0041 só existem no banco)
 └── src/
     ├── middleware.ts
     ├── types/database.ts
@@ -182,7 +184,7 @@ laser-dream-os/
 | `current-profile.ts` | `getCurrentProfile()` devolve `userId`, `organizationId`, `fullName`, `roleName`, `isAdmin`, `isManager` |
 | `unwrap.ts` | `unwrap<T>()` lança erro quando a consulta Supabase retorna `error` |
 | `cpf.ts` | `normalizeCpf` (só dígitos), `formatCpf` (000.000.000-00), `maskCpf` (oculta dígitos), `isValidCpf` (dígitos verificadores) e a lista `UFS` |
-| `backup.ts` | `BACKUP_TABLES`, tipo `BackupPayload`, `buildBackupPayload()`, `RESTORE_DELETE_ORDER` e `RESTORE_INSERT_ORDER` |
+| `backup.ts` | `BACKUP_TABLES`, tipo `BackupPayload`, `buildBackupPayload()`, `RESTORE_DELETE_ORDER` e `RESTORE_INSERT_ORDER`. `buildBackupPayload` conta cada tabela (`count: "exact"`), lê em lotes de 1.000 linhas com `.range()` ordenando pela chave primária até um lote voltar vazio, grava `counts` no JSON e lança erro (nada é salvo) se alguma tabela vier com menos linhas que a contagem |
 | `change-request-labels.ts` | `TABLE_LABELS` (nome amigável por tabela) e o tipo `ChangeRequest` |
 
 `BACKUP_TABLES` contém, nesta ordem: `org_settings`, `payment_methods`, `lead_origins`, `cash_categories`, `sellers`, `seller_pairs`, `procedures`, `procedure_areas`, `clients`, `sales`, `sale_areas`, `cash_transactions`, `cash_closures`, `change_requests`. `RESTORE_DELETE_ORDER` é: `change_requests`, `cash_closures`, `cash_transactions`, `sale_areas`, `sales`, `procedure_areas`, `procedures`, `seller_pairs`, `sellers`, `cash_categories`, `lead_origins`, `payment_methods`, `clients`, `org_settings`. `RESTORE_INSERT_ORDER` é a ordem inversa.
@@ -682,7 +684,7 @@ Vendas. Tabela central do sistema.
 - **Chave primária:** `id`.
 - **RLS (ativo):** SELECT: administrador, gerente ou unidade do usuário. INSERT: mesma regra de unidade. UPDATE: administrador. Sem política de DELETE (exclusão só pela RPC permanent_delete_sale).
 - **Índices e restrições:** Índices idx_sales_client_unit, idx_sales_co_seller, idx_sales_date (sale_date DESC), idx_sales_payment_method, idx_sales_procedure, idx_sales_seller, idx_sales_status, idx_sales_unit. CHECKs sales_amount_check, sales_installments_check, sales_status_check.
-- **Triggers:** trg_sales_classify (BEFORE INSERT, fn_sales_classify), trg_sales_audit (AFTER UPDATE, fn_sales_audit), trg_sale_cash_sync (AFTER INSERT e UPDATE, fn_sale_cash_sync), trg_lancar_entrada_caixa_venda (AFTER INSERT, lancar_entrada_caixa_venda), trg_reverter_entrada_caixa_venda_cancelada (AFTER UPDATE, reverter_entrada_caixa_venda_cancelada).
+- **Triggers:** trg_sales_classify (BEFORE INSERT, fn_sales_classify), trg_sales_audit (AFTER UPDATE, fn_sales_audit), trg_sale_cash_sync (AFTER INSERT e UPDATE, fn_sale_cash_sync), trg_reverter_entrada_caixa_venda_cancelada (AFTER UPDATE, reverter_entrada_caixa_venda_cancelada).
 
 #### `sale_areas`
 
@@ -738,7 +740,7 @@ Lançamentos de entrada e saída de caixa.
 
 - **Chave primária:** `id`.
 - **RLS (ativo):** SELECT e INSERT: administrador ou gerente com a unidade em current_unit_ids(). UPDATE e DELETE: administrador.
-- **Índices e restrições:** Índices idx_cash_tx_sale e idx_cash_tx_unit. CHECKs cash_transactions_amount_check e cash_transactions_type_check.
+- **Índices e restrições:** Índices idx_cash_tx_sale e idx_cash_tx_unit. Índice único parcial `uq_cash_transactions_sale_id` em `sale_id` onde `sale_id is not null` (migração 0042): no máximo um lançamento automático por venda; lançamentos manuais não são afetados. CHECKs cash_transactions_amount_check e cash_transactions_type_check.
 - **Triggers:** trg_block_closed_day (BEFORE INSERT, UPDATE e DELETE, fn_block_closed_day).
 
 #### `cash_closures`
@@ -1121,9 +1123,10 @@ Formato do arquivo de backup (`BackupPayload`, definido em `src/lib/backup.ts`):
 
 | Campo | Tipo | Descrição |
 |---|---|---|
-| `version` | número (`1`) | Versão do formato |
+| `version` | número (`2`) | Versão do formato. `2` desde a leitura paginada; arquivos `1` não têm `counts` e podem estar truncados em 1.000 linhas por tabela |
 | `organization_id` | string (uuid) | Organização do backup |
 | `generated_at` | string (ISO 8601) | Momento da geração |
+| `counts` | objeto `{ [tabela]: número }` | Linhas gravadas por tabela, conferidas contra a contagem do banco no momento da geração |
 | `tables` | objeto `{ [tabela]: linhas[] }` | Linhas de cada tabela de `BACKUP_TABLES` |
 
 **Cobertura:** o backup inclui 14 tabelas (`org_settings`, `payment_methods`, `lead_origins`, `cash_categories`, `sellers`, `seller_pairs`, `procedures`, `procedure_areas`, `clients`, `sales`, `sale_areas`, `cash_transactions`, `cash_closures`, `change_requests`). **Não inclui** `organizations`, `units`, `roles`, `role_permissions`, `profiles`, `user_units`, `invites`, `packages`, `sales_history`, `client_merge_log`, `duplicate_flags`, `cpf_import_staging`, `backups` nem nenhuma tabela do funil e de orçamentos (`funnels`, `pipeline_stages`, `loss_reasons`, `opportunities`, `opportunity_areas`, `opportunity_events`, `opportunity_notes`, `opportunity_interest_areas`, `opportunity_tasks`, `tags`, `opportunity_tags`, `budgets`, `budget_items`, `budget_item_areas`). Ver o risco da restauração em 1.6.
@@ -1189,8 +1192,7 @@ Formato do arquivo de backup (`BackupPayload`, definido em `src/lib/backup.ts`):
 | `sales` | `trg_sales_classify` | BEFORE INSERT | `fn_sales_classify()` | Define `classificacao_financeira` (`RECORRENTE` se a forma de pagamento tem code `boleto_recorrente`, senão `DEMAIS VENDAS`) e `tipo_venda` (`REVENDA` se a origem tem code `cliente_ativo` ou se o cliente já tem venda ativa; senão `VENDA NOVA`) |
 | `sales` | `trg_sales_audit` | AFTER UPDATE | `fn_sales_audit()` | Grava em `sales_history` mudanças de `amount`, `status` e `payment_method` (nome da forma), com `changed_by = updated_by` |
 | `sales` | `trg_sale_cash_sync` | AFTER INSERT e UPDATE | `fn_sale_cash_sync()` | Venda em dinheiro (`payment_methods.code = 'dinheiro'`) e ativa: insere entrada em `cash_transactions` (descrição `Venda <id da venda>`). Em UPDATE: cancelamento apaga os lançamentos da venda; venda em dinheiro ativa atualiza valor, data e unidade (ou insere se não existir); troca para forma que não é dinheiro apaga o lançamento |
-| `sales` | `trg_lancar_entrada_caixa_venda` | AFTER INSERT | `lancar_entrada_caixa_venda()` | Venda em dinheiro e ativa: insere entrada de caixa com descrição `Venda em dinheiro` e `responsible_id = coalesce(seller_id, created_by)`. **Sobrepõe-se a `trg_sale_cash_sync`** (ver 1.6, risco 1) |
-| `sales` | `trg_reverter_entrada_caixa_venda_cancelada` | AFTER UPDATE | `reverter_entrada_caixa_venda_cancelada()` | Ao cancelar (ativa para cancelada) apaga a entrada `Venda em dinheiro` da venda |
+| `sales` | `trg_reverter_entrada_caixa_venda_cancelada` | AFTER UPDATE OF status | `reverter_entrada_caixa_venda_cancelada()` | Ao cancelar (ativa para cancelada) apaga a entrada `Venda em dinheiro` da venda. Desde a migração 0042 nenhuma entrada recebe essa descrição, então o trigger não tem efeito; o cancelamento é tratado por `fn_sale_cash_sync` |
 | `cash_transactions` | `trg_block_closed_day` | BEFORE INSERT, UPDATE e DELETE | `fn_block_closed_day()` | Se existe `cash_closures` da unidade na `transaction_date` com `reopened = false`, lança exceção "Dia de caixa ja fechado para esta unidade" |
 | `opportunity_tasks` | `trg_avancar_followup` | AFTER UPDATE | `avancar_followup()` | Quando uma tarefa `followup_confirmar_N` passa a `done = true`: aplica a etiqueta `Follow-up N` (remove a `Follow-up N-1`); se N < 5 cria a tarefa `followup_confirmar_N+1` com prazo hoje + 2 dias; se N = 5 move a oportunidade para a etapa `Nutrição` do mesmo funil e registra `opportunity_events` |
 
@@ -2143,8 +2145,7 @@ Resposta JSON: `ok`, `tarefas_criadas`, `detalhe`, `leads_etiquetados_esfriando`
 | BEFORE INSERT em `sales` | `trg_sales_classify` (`fn_sales_classify`) | Define `classificacao_financeira` (`RECORRENTE` se a forma de pagamento tem `code = 'boleto_recorrente'`, senão `DEMAIS VENDAS`) e `tipo_venda` (`REVENDA` se a origem tem `code = 'cliente_ativo'` ou o cliente já tem venda `ativa`, senão `VENDA NOVA`) |
 | AFTER UPDATE em `sales` | `trg_sales_audit` (`fn_sales_audit`) | Grava a mudança em `sales_history` |
 | AFTER INSERT e UPDATE em `sales` | `trg_sale_cash_sync` (`fn_sale_cash_sync`) | Na inserção de venda `ativa` paga com forma de `code = 'dinheiro'`, insere entrada com descrição `Venda <id>`; na atualização, apaga a entrada se a venda passa de `ativa` para `cancelada`, ou atualiza valor, data e unidade (criando a entrada se não existir) |
-| AFTER INSERT em `sales` | `trg_lancar_entrada_caixa_venda` (`lancar_entrada_caixa_venda`) | Insere entrada com descrição `Venda em dinheiro` para venda `ativa` com forma de `code = 'dinheiro'` (mesma condição do trigger anterior) |
-| AFTER UPDATE em `sales` | `trg_reverter_entrada_caixa_venda_cancelada` (`reverter_entrada_caixa_venda_cancelada`) | Reverte a entrada de caixa quando a venda é cancelada |
+| AFTER UPDATE em `sales` | `trg_reverter_entrada_caixa_venda_cancelada` (`reverter_entrada_caixa_venda_cancelada`) | Apaga entradas `Venda em dinheiro` ao cancelar; sem efeito desde a 0042 (ver risco 3) |
 | BEFORE INSERT, UPDATE e DELETE em `cash_transactions` | `trg_block_closed_day` (`fn_block_closed_day`) | Impede alteração em dia com `cash_closures` fechado |
 | AFTER UPDATE em `opportunity_tasks` | `trg_avancar_followup` (`avancar_followup`) | Ao concluir tarefa com `auto_rule` `followup_confirmar_N`, aplica a etiqueta `Follow-up N` (removendo a anterior), cria a tarefa N+1 enquanto N < 5 e, ao concluir a quinta, move o lead para a etapa de Nutrição |
 
@@ -2157,10 +2158,10 @@ Levantamento feito comparando o código com o banco real (projeto `nlhohtbgtiuqy
 | # | Prioridade | Achado | Evidência | Recomendação |
 |---|---|---|---|---|
 | 1 | Crítica | Não existe nenhum backup em lugar algum | Tabela `backups` com 0 linhas; painel do Supabase com "No backups"; plano sem backup de plataforma | Gerar um backup manual agora em Configurações e baixar o JSON; verificar `CRON_SECRET` e `SUPABASE_SERVICE_ROLE_KEY` na Vercel para o cron funcionar; considerar plano com backup diário ou o workflow de GitHub Actions para o Google Drive |
-| 2 | Crítica | Backup pode sair incompleto | `buildBackupPayload` usa `select("*")` por tabela sem paginação e o PostgREST limita a resposta (padrão de 1.000 linhas) enquanto há 4.672 clientes e 1.686 vendas | Paginar com `.range(from, to)` em lotes até esgotar; gravar contagem por tabela no JSON e comparar com `count` antes de aceitar o backup; `restore_from_backup` apaga tabelas antes de recarregar, então um backup truncado destrói dados na restauração |
-| 3 | Alta | Venda em dinheiro gera duas entradas de caixa | `trg_lancar_entrada_caixa_venda` e `trg_sale_cash_sync` são AFTER INSERT em `sales`, ambos inserem em `cash_transactions` quando a forma tem `code = 'dinheiro'` e a venda está `ativa`; não há índice único em `cash_transactions.sale_id`. Hoje não há nenhuma linha com `sale_id` preenchido, então o dano ainda não ocorreu | Antes da primeira venda em dinheiro real, remover `trg_lancar_entrada_caixa_venda` (e avaliar `trg_reverter_entrada_caixa_venda_cancelada`, que duplica o DELETE feito por `fn_sale_cash_sync`) e criar índice único parcial em `sale_id`. Teste: criar venda em dinheiro no modo teste e contar linhas por `sale_id` |
+| 2 | Crítica (resolvido no código) | Backup podia sair incompleto | `buildBackupPayload` usava `select("*")` sem paginação e o PostgREST limita a resposta a 1.000 linhas, com 4.672 clientes e 1.686 vendas | **Corrigido:** leitura paginada com `.range()` ordenada pela chave primária, campo `counts` no JSON (formato `version: 2`) e erro se alguma tabela vier com menos linhas que a contagem do banco. Pendente: backups `version: 1` gerados antes da correção podem estar truncados e não devem ser restaurados; `api/backup/restore` ainda não confere `counts` antes de chamar `restore_from_backup` |
+| 3 | Alta (resolvido na 0042) | Venda em dinheiro gerava duas entradas de caixa | `trg_lancar_entrada_caixa_venda` e `trg_sale_cash_sync` eram AFTER INSERT em `sales` e ambos inseriam em `cash_transactions`; além disso `restore_from_backup` desligava só `trg_sale_cash_sync`, então uma restauração também duplicaria o caixa | **Corrigido pela migração 0042:** trigger e função `lancar_entrada_caixa_venda` removidos; índice único parcial `uq_cash_transactions_sale_id`. `fn_sale_cash_sync` é a única origem do lançamento automático. Pendente: `trg_reverter_entrada_caixa_venda_cancelada` ficou sem efeito e pode ser removido. Teste: criar venda em dinheiro no modo teste e contar linhas por `sale_id` |
 | 4 | Alta | Organização fixa no código | UUID `00000000-0000-0000-0000-000000000001` em `cron/backup`, `cron/funil-automacoes`, `scan_duplicates` e `apply_cpf_import` | Aceitável para operação com uma clínica; antes de um segundo cliente, iterar sobre `organizations` |
-| 5 | Alta | Funções `SECURITY DEFINER` executáveis por `anon` | Avisos do Supabase para `avancar_followup`, `get_invite_by_token`, `lancar_entrada_caixa_venda`, `reverter_entrada_caixa_venda_cancelada`; 16 outras executáveis por `authenticated` | `REVOKE EXECUTE ON FUNCTION <nome> FROM anon, public` nas funções de trigger; manter apenas `get_invite_by_token` para `anon` |
+| 5 | Alta | Funções `SECURITY DEFINER` executáveis por `anon` | Avisos do Supabase para `avancar_followup`, `get_invite_by_token`, `reverter_entrada_caixa_venda_cancelada` (`lancar_entrada_caixa_venda` foi removida na 0042); 16 outras executáveis por `authenticated` | `REVOKE EXECUTE ON FUNCTION <nome> FROM anon, public` nas funções de trigger; manter apenas `get_invite_by_token` para `anon` |
 | 6 | Média | Proteção contra senha vazada desativada | Aviso `leaked password protection` no Auth | Ativar em Authentication > Policies |
 | 7 | Média | Extensões `pg_trgm` e `unaccent` no schema `public` | Aviso `extension_in_public` | Mover para o schema `extensions` em janela de manutenção, conferindo se `buscar_clientes_parecidos` e `scan_duplicates` referenciam o schema |
 | 8 | Média | CPF gravado sem normalização no formulário de venda | `new-sale-form.tsx` grava `cpf: clienteCpf.trim()` | Normalizar para somente dígitos antes de gravar e validar com `is_valid_cpf` |
@@ -2168,6 +2169,6 @@ Levantamento feito comparando o código com o banco real (projeto `nlhohtbgtiuqy
 | 10 | Média | Aprovação de solicitações aplicada no cliente | `request-actions.tsx` executa as alterações no navegador do administrador | Mover para uma RPC transacional para evitar aprovação parcial |
 | 11 | Baixa | Tipos do banco desatualizados | `src/types/database.ts` não reflete as 41 tabelas e a view | Regenerar com `supabase gen types typescript` e fixar no repositório |
 | 12 | Baixa | Estruturas sem uso | `organizations`, `role_permissions`, `packages` sem código; `orcamentos` com status `convertido` e `perdido` que nenhum código grava | Decidir entre implementar ou remover |
-| 13 | Baixa | Sem testes automatizados e sem integração Git no Supabase | Nenhum script de teste; migrações não versionadas no repositório (última aplicada: migração 0041, que remove a tabela de backup de clientes pré-CPF) | Exportar as migrações para `supabase/migrations/` e criar ao menos testes das regras de caixa e de classificação de venda |
+| 13 | Baixa | Sem testes automatizados e sem integração Git no Supabase | Nenhum script de teste; migrações 0001 a 0041 não versionadas no repositório; a partir da 0042 os arquivos ficam em `supabase/migrations/` (última aplicada: 0042, entrada de caixa única por venda) | Exportar as migrações 0001 a 0041 para `supabase/migrations/` e criar ao menos testes das regras de caixa e de classificação de venda |
 
 **Recomendação.** Executar os itens 1 e 2 antes de qualquer outra mudança: hoje uma falha no banco significa perda total de dados, e o backup atual, mesmo quando existir, pode não conter todos os registros. Em seguida, tratar o item 3 (risco financeiro de lançamento duplicado) e o item 5.
