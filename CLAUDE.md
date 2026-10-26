@@ -14,6 +14,7 @@ Sistema de gestão de clínica (vendas, caixa, clientes, funil comercial, orçam
 | Servir o build | `npm run start` |
 | Lint (ESLint padrão do Next) | `npm run lint` |
 | Testes | não existem; validar com `npm run build` e `npm run lint` e testar a tela no modo teste |
+| Página de SQL para o dono rodar (seção 12) | `python3 scripts/gerar-pagina-sql.py saida.html supabase/migrations/NNNN.sql --titulo ... --conferencia "select ..." --esperado coluna=valor` e publicar com a ferramenta Artifact |
 | Auditar embeds ambíguos do Supabase | `python3 scripts/audit_embeds.py` (usa `scripts/fk_map.json`) |
 | Deploy | push na branch `main` dispara deploy na Vercel; os crons vêm de `vercel.json` |
 | Disparar cron manualmente | `curl -H "Authorization: Bearer $CRON_SECRET" https://<dominio>/api/cron/backup` e `/api/cron/funil-automacoes` |
@@ -41,6 +42,7 @@ Next.js 14.2.35 (App Router), React 18.3, TypeScript 5.5 em modo estrito, Tailwi
 11. Caixa: dia com `cash_closures` fechado bloqueia INSERT, UPDATE e DELETE em `cash_transactions` (trigger `trg_block_closed_day`).
 12. Rotas de cron validam `Authorization: Bearer CRON_SECRET` e usam a organização fixa `00000000-0000-0000-0000-000000000001`.
 13. Não criar migração, trigger ou função que repita efeito já existente. Antes de mexer em venda ou caixa, ler os triggers de `sales` e `cash_transactions` em `ARCHITECTURE.md` 1.2.4 e o risco 3 de 1.6.
+14. Segurança: tabela nova não concede nada a `anon` (padrão fechado pela 0044); função nova termina com `revoke execute on function <nome> from public, anon;` e `grant execute ... to authenticated, service_role;`, e função de gatilho também sem `authenticated`. Só `get_invite_by_token` é aberta para `anon`. Serviço externo novo no navegador precisa entrar na CSP de `next.config.mjs`.
 
 ## 4. Papéis
 
@@ -121,7 +123,7 @@ Triggers: `trg_sales_classify` (BEFORE INSERT em `sales`), `trg_sales_audit` (AF
 
 ## 9. Pontos de atenção atuais
 
-Resumo dos riscos de `ARCHITECTURE.md` 1.6: (1) não existe backup salvo em lugar algum; (2) resolvido: `buildBackupPayload` pagina, grava `counts` (formato `version: 2`) e falha se faltar linha, mas backups `version: 1` podem estar truncados; (3) resolvido na 0042: um só trigger lança a entrada de caixa da venda; (4) organização fixa no código; (5) funções `SECURITY DEFINER` executáveis por `anon`; (9) resolvido: datas no fuso de Brasília; (14) resolvido: listas grandes paginadas com `buscarTodas`. A restauração recusa backup `version: 1` e backup cujo `counts` não bata com `tables`.
+Resumo dos riscos de `ARCHITECTURE.md` 1.6: (1) não existe backup salvo em lugar algum; (2) resolvido: `buildBackupPayload` pagina, grava `counts` (formato `version: 2`) e falha se faltar linha, mas backups `version: 1` podem estar truncados; (3) resolvido na 0042: um só trigger lança a entrada de caixa da venda; (4) organização fixa no código; (5) `anon` com privilégios em todas as tabelas: correção na 0044, aguardando aplicação; (9) resolvido: datas no fuso de Brasília; (14) resolvido: listas grandes paginadas com `buscarTodas`. A restauração recusa backup `version: 1` e backup cujo `counts` não bata com `tables`.
 
 ## 10. Como manter este arquivo
 

@@ -128,7 +128,8 @@ laser-dream-os/
 │   └── wordmark-dark.png
 ├── scripts/
 │   ├── audit_embeds.py
-│   └── fk_map.json
+│   ├── fk_map.json
+│   └── gerar-pagina-sql.py
 ├── supabase/
 │   └── migrations/        (a partir da 0042; 0001 a 0041 só existem no banco)
 └── src/
@@ -158,7 +159,7 @@ laser-dream-os/
 |---|---|
 | `package.json` | Nome `laser-dream-os` 0.1.0, scripts `dev`, `build`, `start`, `lint` e dependências |
 | `package-lock.json` | Versões travadas das dependências |
-| `next.config.mjs` | Configuração do Next com `reactStrictMode: true` |
+| `next.config.mjs` | Configuração do Next com `reactStrictMode: true` e cabeçalhos de segurança em todas as rotas: CSP (`default-src 'self'`; scripts e estilos do próprio site com `'unsafe-inline'`, exigido pelo script de tema e pelo Next, mais `'unsafe-eval'` só em desenvolvimento; `connect-src` só o próprio site e `*.supabase.co`; `frame-ancestors 'none'`), HSTS de 2 anos, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: strict-origin-when-cross-origin` e `Permissions-Policy` sem câmera, microfone, localização e pagamento. Serviço externo novo (fontes, analytics, monitoramento) precisa entrar na CSP, senão é bloqueado sem aviso |
 | `tsconfig.json` | TypeScript estrito; alias `@/*` aponta para `./src/*` |
 | `tailwind.config.ts` | `darkMode: "class"`, paletas `gold` e `ink`, `surface` e `destructive`, com cores de fundo, borda e texto vindas das variáveis CSS de `globals.css` |
 | `postcss.config.js` | Plugins `tailwindcss` e `autoprefixer` |
@@ -175,6 +176,7 @@ laser-dream-os/
 |---|---|
 | `audit_embeds.py` | Varre `src` procurando consultas `.from` com `.select` que usam embeds e confere contra `fk_map.json` se algum embed é ambíguo (mais de uma FK entre as tabelas) e não usa o nome da FK |
 | `fk_map.json` | Mapa de quantidade de FKs entre pares de tabelas, extraído do banco. Está defasado: não tem `funnels`, `tags`, `opportunity_tags`, `opportunity_notes`, `opportunity_tasks`, `opportunity_interest_areas`, `budgets`, `budget_items` e `budget_item_areas`, e cita `opportunity_areas` onde o código usa `opportunity_interest_areas` |
+| `gerar-pagina-sql.py` | Gera a página (Artifact) para o dono rodar SQL no celular: link do SQL Editor, passos, um cartão por arquivo `.sql` com botão Copiar e a conferência com os valores esperados. Uso: `python3 scripts/gerar-pagina-sql.py saida.html supabase/migrations/NNNN.sql --titulo ... --conferencia "select ..." --esperado coluna=valor`. O título do cartão é a segunda linha de comentário do arquivo |
 
 #### `src/lib/`
 
@@ -2163,7 +2165,7 @@ Levantamento feito comparando o código com o banco real (projeto `nlhohtbgtiuqy
 | 2 | Crítica (resolvido no código) | Backup podia sair incompleto | `buildBackupPayload` usava `select("*")` sem paginação e o PostgREST limita a resposta a 1.000 linhas, com 4.672 clientes e 1.686 vendas | **Corrigido:** leitura paginada com `.range()` ordenada pela chave primária, campo `counts` no JSON (formato `version: 2`) e erro se alguma tabela vier com menos linhas que a contagem do banco. `api/backup/restore` recusa backup `version: 1` e backup cujo `counts` não bata com o tamanho de cada lista de `tables`, antes de gerar o backup de segurança e de chamar `restore_from_backup`. Backups `version: 1` já existentes não podem mais ser restaurados |
 | 3 | Alta (resolvido na 0042) | Venda em dinheiro gerava duas entradas de caixa | `trg_lancar_entrada_caixa_venda` e `trg_sale_cash_sync` eram AFTER INSERT em `sales` e ambos inseriam em `cash_transactions`; além disso `restore_from_backup` desligava só `trg_sale_cash_sync`, então uma restauração também duplicaria o caixa | **Corrigido pela migração 0042:** trigger e função `lancar_entrada_caixa_venda` removidos; índice único parcial `uq_cash_transactions_sale_id`. `fn_sale_cash_sync` é a única origem do lançamento automático. A migração 0043 remove também `trg_reverter_entrada_caixa_venda_cancelada` e sua função, que ficaram sem efeito (o cancelamento é tratado por `fn_sale_cash_sync`). Teste: criar venda em dinheiro no modo teste e contar linhas por `sale_id` |
 | 4 | Alta | Organização fixa no código | UUID `00000000-0000-0000-0000-000000000001` em `cron/backup`, `cron/funil-automacoes`, `scan_duplicates` e `apply_cpf_import` | Aceitável para operação com uma clínica; antes de um segundo cliente, iterar sobre `organizations` |
-| 5 | Alta | Funções `SECURITY DEFINER` executáveis por `anon` | Avisos do Supabase para `avancar_followup`, `get_invite_by_token` (`lancar_entrada_caixa_venda` e `reverter_entrada_caixa_venda_cancelada` foram removidas nas migrações 0042 e 0043); 16 outras executáveis por `authenticated` | `REVOKE EXECUTE ON FUNCTION <nome> FROM anon, public` nas funções de trigger; manter apenas `get_invite_by_token` para `anon` |
+| 5 | Alta (correção pronta na 0044, aguardando aplicação) | `anon` com privilégios em tudo | Em 26/10/2026, `anon` (sem login) tinha SELECT, INSERT, UPDATE e DELETE nas 41 tabelas e na view `client_intelligence` (294 privilégios), protegidas só pela RLS; os padrões do schema davam o mesmo a tabelas e funções futuras; o gatilho `avancar_followup` e `is_valid_cpf` eram executáveis por `anon` | Migração `0044_fechar_acesso_anon.sql` (testada no banco real numa transação revertida): tira de `anon` tabelas, sequências e padrões futuros, fecha `avancar_followup` para todos e `is_valid_cpf` para `anon` (fica para `authenticated`, usada no CHECK `clients_cpf_valido`) e mantém só `get_invite_by_token` para `anon`. Prática trazida da Harmonize |
 | 6 | Média | Proteção contra senha vazada desativada | Aviso `leaked password protection` no Auth | Ativar em Authentication > Policies |
 | 7 | Média | Extensões `pg_trgm` e `unaccent` no schema `public` | Aviso `extension_in_public` | Mover para o schema `extensions` em janela de manutenção, conferindo se `buscar_clientes_parecidos` e `scan_duplicates` referenciam o schema |
 | 8 | Média | CPF gravado sem normalização no formulário de venda | `new-sale-form.tsx` grava `cpf: clienteCpf.trim()` | Normalizar para somente dígitos antes de gravar e validar com `is_valid_cpf` |
