@@ -238,7 +238,7 @@ export default async function FunilPage({
         <div>
           <h2 className="font-display font-semibold text-2xl text-foreground">Funil</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Arraste o card para outra coluna, ou clique nele para ver o histórico completo do lead.
+            Mova o lead de etapa pelo botão Mover ou arrastando no quadro. Toque no card para ver o histórico completo.
           </p>
         </div>
         <div className="flex items-center gap-2">

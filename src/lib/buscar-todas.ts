@@ -45,5 +45,5 @@ export async function buscarTodas<T>(
     if (lote.length === 0) return linhas;
     linhas.push(...lote);
   }
-  throw new Error(`Falha ao carregar ${contexto}: mais de ${limite} linhas; refine o filtro.`);
+  throw new Error(`Falha ao carregar ${contexto}: chegou ao limite de ${limite} linhas; refine o filtro.`);
 }

@@ -73,7 +73,7 @@ export default async function ConfiguracoesPage() {
       )}
 
       {isAdmin && (
-        <section>
+        <section id="backup" className="scroll-mt-6">
           <h3 className="mb-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">
             Backup
           </h3>

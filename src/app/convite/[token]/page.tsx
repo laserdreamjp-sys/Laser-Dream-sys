@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { useParams, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { DICA_SENHA, problemaSenha } from "@/lib/senha";
 
 type InviteInfo = {
   email: string;
@@ -46,6 +47,13 @@ export default function AcceptInvitePage() {
     if (!invite) return;
 
     setError(null);
+
+    const problema = problemaSenha(password);
+    if (problema) {
+      setError(problema);
+      return;
+    }
+
     setSubmitting(true);
 
     const { error } = await supabase.auth.signUp({
@@ -123,9 +131,13 @@ export default function AcceptInvitePage() {
               required
               minLength={8}
               value={password}
+              aria-describedby="password-hint"
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-gold-500"
             />
+            <p id="password-hint" className="mt-1 text-xs text-muted-foreground">
+              {DICA_SENHA}
+            </p>
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

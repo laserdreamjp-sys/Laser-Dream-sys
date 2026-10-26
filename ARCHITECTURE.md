@@ -103,9 +103,11 @@ A tabela `role_permissions` existe no banco, mas nenhuma tela ou rota a consulta
 | `dev` | `next dev` | Servidor local em `http://localhost:3000` |
 | `build` | `next build` | Build de produção (roda checagem de tipos) |
 | `start` | `next start` | Serve o build |
-| `lint` | `next lint` | ESLint do Next |
+| `lint` | `next lint` | ESLint do Next (o repositório não tem arquivo de configuração; o comando pede para criar um) |
+| `test` | `vitest run` | Testes automáticos (vitest 2.1.9, `vitest.config.ts`, arquivos `src/**/*.test.ts`) |
+| `test:watch` | `vitest` | Testes em modo contínuo |
 
-Não existe script de teste automatizado nem configuração de ESLint própria além do padrão do Next.
+Testes existentes: `src/lib/datas.test.ts` (fuso de Brasília, virada de dia, mês e ano), `src/lib/buscar-todas.test.ts` (paginação, servidor com limite menor que o lote, erros) e `src/lib/backup.test.ts` (backup completo, contagem divergente, erros), com cliente Supabase falso em memória.
 
 ### Estrutura de diretórios e responsabilidade de cada arquivo
 
@@ -142,6 +144,7 @@ laser-dream-os/
     │   ├── cpf.ts
     │   ├── current-profile.ts
     │   ├── datas.ts
+    │   ├── senha.ts
     │   ├── unwrap.ts
     │   └── supabase/{client.ts, server.ts, service.ts}
     ├── components/            (32 arquivos, listados abaixo)
@@ -188,6 +191,7 @@ laser-dream-os/
 | `current-profile.ts` | `getCurrentProfile()` devolve `userId`, `organizationId`, `fullName`, `roleName`, `isAdmin`, `isManager` |
 | `unwrap.ts` | `unwrap<T>()` lança erro quando a consulta Supabase retorna `error` |
 | `buscar-todas.ts` | `buscarTodas(consulta, contexto)`: lê todas as linhas em lotes de 1.000 (`TAMANHO_DO_LOTE`), avançando pelo que veio e parando no lote vazio; lança erro em vez de devolver lista parcial. A consulta recebe `(de, ate)`, precisa de ordem estável terminando em coluna única e de `.range(de, ate)`. Usado no Radar, no Dashboard (contagem do Radar e totais de caixa) e nas 4 exportações CSV |
+| `senha.ts` | `problemaSenha(senha)` devolve a mensagem do primeiro problema ou `null` (mínimo 8 caracteres, minúscula, maiúscula e número) e `DICA_SENHA`; usado no cadastro por convite |
 | `datas.ts` | Datas no fuso `America/Sao_Paulo`: `hojeLocal()`, `dataLocal(instante)`, `somarDias(data, n)`, `mesAtualLocal()`, `primeiroDiaDoMesLocal()`. Substitui `toISOString().slice(0,10)`, que dá a data em UTC |
 | `cpf.ts` | `normalizeCpf` (só dígitos), `formatCpf` (000.000.000-00), `maskCpf` (oculta dígitos), `isValidCpf` (dígitos verificadores) e a lista `UFS` |
 | `backup.ts` | `BACKUP_TABLES`, tipo `BackupPayload`, `buildBackupPayload()`, `RESTORE_DELETE_ORDER` e `RESTORE_INSERT_ORDER`. `buildBackupPayload` conta cada tabela (`count: "exact"`), lê em lotes de 1.000 linhas com `.range()` ordenando pela chave primária até um lote voltar vazio, grava `counts` no JSON e lança erro (nada é salvo) se alguma tabela vier com menos linhas que a contagem |
@@ -213,7 +217,7 @@ Tipos gerados do Supabase em estado **defasado**. Cobre apenas `cash_categories`
 | `globals.css` | todas | Variáveis CSS do tema claro (`:root`) e escuro (`.dark`): `--background`, `--foreground`, `--surface`, `--muted`, `--muted-foreground`, `--border`; fonte Inter, transição de cor e cor de seleção |
 | `page.tsx` | `/` | `RootPage` redireciona para `/dashboard` |
 | `login/page.tsx` | `/login` | `LoginPage` e `handleSubmit`: `signInWithPassword` e redireciona |
-| `convite/[token]/page.tsx` | `/convite/[token]` | `AcceptInvitePage`: consulta o convite pela RPC `get_invite_by_token`, mostra e-mail, papel e unidade e cria a conta com `signUp`. `CenteredMessage` mostra convite inválido ou expirado |
+| `convite/[token]/page.tsx` | `/convite/[token]` | `AcceptInvitePage`: consulta o convite pela RPC `get_invite_by_token`, mostra e-mail, papel e unidade e cria a conta com `signUp`, depois de conferir a senha com `problemaSenha` (dica das regras abaixo do campo). `CenteredMessage` mostra convite inválido ou expirado |
 | `(app)/layout.tsx` | telas autenticadas | `AppLayout` busca o perfil e renderiza `Sidebar` e `GlobalSearch` |
 | `(app)/error.tsx` | telas autenticadas | `AppError` mostra mensagem de erro com botão de tentar de novo |
 | `(app)/dashboard/page.tsx` | `/dashboard` | `DashboardPage`: indicadores do mês, gráficos, alertas, rankings (detalhe em 1.3.1) |
@@ -268,7 +272,10 @@ Tipos gerados do Supabase em estado **defasado**. Cobre apenas `cash_categories`
 | `new-cash-in-form.tsx` | `NewCashInForm` | Lançar entrada de caixa |
 | `new-cash-out-form.tsx` | `NewCashOutForm` | Lançar saída de caixa |
 | `close-register-form.tsx` | `CloseRegisterForm` | Fechar (`handleClose`) e reabrir (`handleReopen`) o caixa do dia |
-| `funil-board.tsx` | `FunilBoard` | Kanban com `DraggableCard`, `DroppableColumn`, `moveStage`, `handleDragStart`, `handleDragEnd`, `confirmLoss` |
+| `funil-board.tsx` | `FunilBoard` | Escolhe a visão (Lista ou Quadro, `localStorage` `laser_dream_funil_visao`; sem escolha, Lista abaixo de 768 px e Quadro acima), Quadro com `DraggableCard` e `DroppableColumn`, `solicitarMovimento` (caminho único do arrastar e do Mover), `moveStage` (mostra o erro na tela se a gravação falhar), `confirmLoss` e o `LeadDetailModal` |
+| `funil-lista.tsx` | `FunilLista` | Visão Lista: abas por etapa com contagem (`role="tablist"`, setas, Home e End), cartões empilhados da etapa ativa; só exibe, quem grava é o board |
+| `funil-card.tsx` | `FunilCardInfo`, `RegistrarVendaLink`, `formatCurrency` | Conteúdo do cartão do lead, usado pelas duas visões |
+| `funil-mover-menu.tsx` | `FunilMoverMenu` | Botão "Mover ▾" com as etapas do funil (atual desativada, perda em vermelho); fecha com Esc e ao tocar fora |
 | `funil-user-filter.tsx` | `FunilUserFilter` | Seletor de usuário do funil, grava o parâmetro `usuario` na URL |
 | `new-opportunity-button.tsx` | `NewOpportunityButton` | Criar lead (`selecionarCliente`, `limparSelecao`, `verificarParecidos`, `handleSubmit`) |
 | `lead-detail-modal.tsx` | `LeadDetailModal` | Detalhe do lead: `salvarAvaliacao`, `salvarInteresse`, `salvarNota`, `alternarTag`, `criarEAplicarTag`, `criarTarefa`, `alternarTarefa` |
@@ -1777,6 +1784,7 @@ Legenda de permissões: **Admin** = `Administrador`; **Gerente** = `Gerente`; **
 
 | Indicador | Cálculo exato |
 |---|---|
+| Lembrete de backup (só Admin) | Aviso no topo com "Nenhum backup salvo" ou "Último backup há N dias" quando o backup mais recente de `backups` tem mais de 7 dias (dias contados no fuso de Brasília), com link para `/configuracoes#backup`. Se a leitura falhar, o aviso só não aparece |
 | Faturamento do mês | Soma de `sales.amount` com `status = 'ativa'` e `sale_date >= primeiro dia do mês` (sem limite superior) |
 | Número de vendas | Quantidade dessas vendas |
 | Ticket médio | Faturamento dividido pelo número de vendas (0 se não há vendas) |
@@ -1882,15 +1890,15 @@ Regras adicionais: o banco impede UPDATE de `sales` por quem não é Admin (`sal
 
 ### 1.3.6 Funil comercial (`/funil`)
 
-**O que faz.** Quadro kanban de leads por etapa, com vários funis. Permite criar leads, arrastar entre etapas, registrar avaliação, interesse, origem, indicação, notas, etiquetas e tarefas, e transformar o lead ganho em venda.
+**O que faz.** Leads por etapa, com vários funis, em duas visões (modelo da Harmonize): Lista com abas de etapa (padrão no celular) e Quadro kanban (padrão no computador); a escolha fica no aparelho. Permite criar leads, mover entre etapas pelo botão "Mover ▾" ou arrastando no quadro, registrar avaliação, interesse, origem, indicação, notas, etiquetas e tarefas, e transformar o lead ganho em venda.
 
-**Onde.** `funil/page.tsx` (`FunilPage`), `funil-board.tsx` (`FunilBoard`, `moveStage`, `handleDragEnd`, `confirmLoss`), `lead-detail-modal.tsx` (`LeadDetailModal`), `new-opportunity-button.tsx` (`NewOpportunityButton`), `funil-user-filter.tsx`, `column-filter.tsx`.
+**Onde.** `funil/page.tsx` (`FunilPage`), `funil-board.tsx` (`FunilBoard`, `solicitarMovimento`, `moveStage`, `handleDragEnd`, `confirmLoss`), `funil-lista.tsx`, `funil-card.tsx`, `funil-mover-menu.tsx`, `lead-detail-modal.tsx` (`LeadDetailModal`), `new-opportunity-button.tsx` (`NewOpportunityButton`), `funil-user-filter.tsx`, `column-filter.tsx`.
 
 **Fluxo.**
 
 1. A página lista os funis ativos (`funnels.active`, ordenados por `position`) e abre o escolhido em `?funil=` (padrão o primeiro). As colunas são `pipeline_stages` do funil ordenadas por `position`.
 2. **Novo lead (`NewOpportunityButton.handleSubmit`):** escolhe ou cria o cliente. Ao digitar um nome novo, `verificarParecidos` chama a RPC `buscar_clientes_parecidos` e sugere cadastros parecidos para evitar duplicidade. Grava em `opportunities` (`is_test` vem do modo teste).
-3. **Mover (`moveStage`):** arrastar o cartão (mouse com 6 px de distância ou toque com 150 ms) atualiza `opportunities.stage_id`, `loss_reason_id` e `updated_at` e insere `opportunity_events` (de, para). Soltar numa etapa com `is_lost = true` abre um modal que **exige motivo de perda** (`confirmLoss`); sair da etapa de perda limpa o motivo.
+3. **Mover (`solicitarMovimento` → `moveStage`):** o botão "Mover ▾" da Lista ou arrastar o cartão no Quadro (mouse com 6 px de distância ou toque com 150 ms) passam pelo mesmo caminho, que atualiza `opportunities.stage_id`, `loss_reason_id` e `updated_at` e insere `opportunity_events` (de, para). Soltar numa etapa com `is_lost = true` abre um modal que **exige motivo de perda** (`confirmLoss`); sair da etapa de perda limpa o motivo. Falha ao gravar a etapa ou o histórico aparece num aviso no topo do funil (antes passava calada).
 4. **Detalhe do lead (`LeadDetailModal`):** `salvarAvaliacao` (`data_avaliacao`), `salvarInteresse` (origem, indicado por, procedimento de interesse e áreas de interesse, que regravam `opportunity_interest_areas`), `salvarNota` (`opportunity_notes`), `alternarTag` e `criarEAplicarTag` (`tags` e `opportunity_tags`), `criarTarefa` (`opportunity_tasks`, com responsável vendedora opcional) e `alternarTarefa` (marcar feito).
 5. **Registrar venda:** em lead ganho sem venda aparece o atalho "Registrar venda" que abre `/vendas/novo?opportunityId=&clientId=&sellerId=`; ao salvar a venda, `opportunities.sale_id` é preenchido.
 6. **Orçamento:** o detalhe do lead (`LeadDetailModal`) tem um link para `/orcamentos/novo?opportunityId=&clientId=`.
@@ -2166,14 +2174,15 @@ Levantamento feito comparando o código com o banco real (projeto `nlhohtbgtiuqy
 | 3 | Alta (resolvido na 0042) | Venda em dinheiro gerava duas entradas de caixa | `trg_lancar_entrada_caixa_venda` e `trg_sale_cash_sync` eram AFTER INSERT em `sales` e ambos inseriam em `cash_transactions`; além disso `restore_from_backup` desligava só `trg_sale_cash_sync`, então uma restauração também duplicaria o caixa | **Corrigido pela migração 0042:** trigger e função `lancar_entrada_caixa_venda` removidos; índice único parcial `uq_cash_transactions_sale_id`. `fn_sale_cash_sync` é a única origem do lançamento automático. A migração 0043 remove também `trg_reverter_entrada_caixa_venda_cancelada` e sua função, que ficaram sem efeito (o cancelamento é tratado por `fn_sale_cash_sync`). Teste: criar venda em dinheiro no modo teste e contar linhas por `sale_id` |
 | 4 | Alta | Organização fixa no código | UUID `00000000-0000-0000-0000-000000000001` em `cron/backup`, `cron/funil-automacoes`, `scan_duplicates` e `apply_cpf_import` | Aceitável para operação com uma clínica; antes de um segundo cliente, iterar sobre `organizations` |
 | 5 | Alta (resolvido na 0044) | `anon` com privilégios em tudo | Em 26/10/2026, `anon` (sem login) tinha SELECT, INSERT, UPDATE e DELETE nas 41 tabelas e na view `client_intelligence` (294 privilégios), protegidas só pela RLS; os padrões do schema davam o mesmo a tabelas e funções futuras; o gatilho `avancar_followup` e `is_valid_cpf` eram executáveis por `anon` | Migração `0044_fechar_acesso_anon.sql` (testada no banco real numa transação revertida): tira de `anon` tabelas, sequências e padrões futuros, fecha `avancar_followup` para todos e `is_valid_cpf` para `anon` (fica para `authenticated`, usada no CHECK `clients_cpf_valido`) e mantém só `get_invite_by_token` para `anon`. Aplicada pelo dono no SQL Editor e conferida no banco: 0 privilégios de `anon` em tabelas, só `get_invite_by_token` executável por `anon`, padrões futuros fechados. Prática trazida da Harmonize |
-| 6 | Média | Proteção contra senha vazada desativada | Aviso `leaked password protection` no Auth | Ativar em Authentication > Policies |
+| 6 | Média | Senha fraca aceita e proteção contra senha vazada desativada | Aviso `leaked password protection` no Auth; o cadastro por convite aceitava qualquer senha de 6 caracteres | Na tela de convite, `problemaSenha` exige 8 caracteres com minúscula, maiúscula e número. Pendente no painel do Supabase (Authentication, provedor Email): mínimo 8 e exigência de minúscula, maiúscula e número, para valer também fora da tela; ligar "leaked password protection" se o plano permitir |
 | 7 | Média | Extensões `pg_trgm` e `unaccent` no schema `public` | Aviso `extension_in_public` | Mover para o schema `extensions` em janela de manutenção, conferindo se `buscar_clientes_parecidos` e `scan_duplicates` referenciam o schema |
 | 8 | Média | CPF gravado sem normalização no formulário de venda | `new-sale-form.tsx` grava `cpf: clienteCpf.trim()` | Normalizar para somente dígitos antes de gravar e validar com `is_valid_cpf` |
 | 9 | Média (resolvido no código) | Data de hoje em UTC | Formulários de venda, caixa e orçamento, telas de caixa, vendas, dashboard e funil e o cron `funil-automacoes` usavam `toISOString().slice(0,10)`: depois das 21h em São Paulo o "hoje" virava o dia seguinte, e a avaliação marcada depois das 21h não gerava a tarefa de confirmação | **Corrigido:** tudo passa por `src/lib/datas.ts` (fuso `America/Sao_Paulo`), inclusive a data da avaliação no cron. Pendente: `permanent_delete_sale` e outras funções do banco ainda usam `current_date` (UTC) |
 | 10 | Média | Aprovação de solicitações aplicada no cliente | `request-actions.tsx` executa as alterações no navegador do administrador | Mover para uma RPC transacional para evitar aprovação parcial |
 | 11 | Baixa | Tipos do banco desatualizados | `src/types/database.ts` não reflete as 41 tabelas e a view | Regenerar com `supabase gen types typescript` e fixar no repositório |
 | 12 | Baixa | Estruturas sem uso | `organizations`, `role_permissions`, `packages` sem código; `orcamentos` com status `convertido` e `perdido` que nenhum código grava | Decidir entre implementar ou remover |
-| 13 | Baixa | Sem testes automatizados e sem integração Git no Supabase | Nenhum script de teste; migrações 0001 a 0041 não versionadas no repositório; a partir da 0042 os arquivos ficam em `supabase/migrations/` (0042: entrada de caixa única por venda; 0043: remove o trigger reverter; 0044: fecha o acesso de `anon`) | Exportar as migrações 0001 a 0041 para `supabase/migrations/` e criar ao menos testes das regras de caixa e de classificação de venda |
+| 13 | Baixa | Sem testes automatizados e sem integração Git no Supabase | Nenhum script de teste; migrações 0001 a 0041 não versionadas no repositório; a partir da 0042 os arquivos ficam em `supabase/migrations/` (0042: entrada de caixa única por venda; 0043: remove o trigger reverter; 0044: fecha o acesso de `anon`) | Testes automáticos existem desde 26/10/2026 (`npm test`, 28 testes de datas, paginação e backup). Falta exportar as migrações 0001 a 0041 e cobrir as regras de caixa e de classificação de venda |
 | 14 | Crítica (resolvido no código) | Listas cortadas em 1.000 linhas sem aviso | O Supabase devolve no máximo 1.000 linhas por resposta. `client_intelligence` tem 4.672 linhas e `sales` 1.686: o Radar mostrava só os 1.000 clientes de maior valor, a contagem do Radar no Dashboard saía errada e as exportações CSV (`vendas`, `clientes-procedimentos`, `clientes-completo`, `radar`) vinham incompletas | **Corrigido:** essas leituras usam `buscarTodas` (`src/lib/buscar-todas.ts`). Regra: lista que pode passar de 1.000 linhas usa `buscarTodas`. Prática trazida da Harmonize |
+| 15 | Média (correção pronta na 0045, aguardando teste e aplicação) | Sem histórico geral de alterações | Só a venda tinha histórico (`sales_history`, três campos); edição e exclusão de cliente, caixa, fechamento, usuários, convites, configurações e catálogos não deixavam rastro de quem fez | Migração `0045_movimentacoes.sql` (modelo da Harmonize): tabela `movimentacoes` (quem, ação criado/editado/excluido/restaurado, entidade, descrição legível, detalhes de/para), escrita só pelo gatilho `fn_registrar_movimentacao` em 18 tabelas, leitura só do Admin, sem política de escrita; não repete `sales_history`; senha de exclusão aparece como `***`; `restore_from_backup` desliga o registro durante a carga e grava uma linha de resumo. Fica fora do backup de propósito (a restauração apagaria o histórico). Falta: testar no banco numa transação revertida, aplicar e criar a tela |
 
 **Recomendação.** Executar os itens 1 e 2 antes de qualquer outra mudança: hoje uma falha no banco significa perda total de dados, e o backup atual, mesmo quando existir, pode não conter todos os registros. Em seguida, tratar o item 3 (risco financeiro de lançamento duplicado) e o item 5.

@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -18,44 +16,44 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { hojeLocal } from "@/lib/datas";
 import { LeadDetailModal } from "@/components/lead-detail-modal";
+import {
+  FunilCardInfo,
+  RegistrarVendaLink,
+  formatCurrency,
+  type FunilLossReason as LossReason,
+  type FunilOpportunity as Opportunity,
+  type FunilStage as Stage,
+  type FunilTag as Tag,
+  type FunilTask as Task,
+} from "@/components/funil-card";
+import { FunilLista } from "@/components/funil-lista";
 
-type Stage = { id: string; name: string; position: number; is_won: boolean; is_lost: boolean };
 type Note = { id: string; content: string; created_at: string; author_id: string | null; author_name?: string };
-type Tag = { id: string; name: string; color: string };
-type Task = {
-  id: string;
-  title: string;
-  due_date: string | null;
-  done: boolean;
-  assigned_to: string | null;
-  assigned_name?: string;
-};
 type Origin = { id: string; name: string };
 type Procedure = { id: string; name: string; segment: string | null };
 type Area = { id: string; name: string; group_label: string | null; procedure_id: string | null; segment: string | null };
 type Seller = { id: string; name: string };
-type Opportunity = {
-  id: string;
-  client_id: string;
-  stage_id: string;
-  seller_id: string | null;
-  estimated_value: number | null;
-  notes: string | null;
-  sale_id: string | null;
-  loss_reason_id: string | null;
-  lead_origin_id: string | null;
-  referred_by_name: string | null;
-  interesse_procedure_id: string | null;
-  is_test?: boolean;
-  data_avaliacao: string | null;
-  clients: { name: string } | null;
-  sellers: { name: string } | null;
-};
-type LossReason = { id: string; name: string };
 
-function formatCurrency(value: number | null) {
-  if (value === null || value === undefined) return "-";
-  return value.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+type Visao = "lista" | "quadro";
+const CHAVE_VISAO = "laser_dream_funil_visao";
+// abaixo de 768px (breakpoint `md` do Tailwind) a visão padrão é Lista
+const CONSULTA_TELA_ESTREITA = "(max-width: 767px)";
+
+function lerVisaoSalva(): Visao | null {
+  try {
+    const v = window.localStorage.getItem(CHAVE_VISAO);
+    return v === "lista" || v === "quadro" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+function salvarVisao(v: Visao) {
+  try {
+    window.localStorage.setItem(CHAVE_VISAO, v);
+  } catch {
+    // sem armazenamento (aba anônima, bloqueio): a escolha vale só nesta visita
+  }
 }
 
 function DraggableCard({
@@ -140,14 +138,36 @@ export function FunilBoard({
   sellers: Seller[];
 }) {
   const supabase = createClient();
-  const router = useRouter();
   const [items, setItems] = useState(opportunities);
   const [lossModal, setLossModal] = useState<{ opportunityId: string; targetStageId: string } | null>(null);
   const [selectedReason, setSelectedReason] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [erroMover, setErroMover] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [justDraggedId, setJustDraggedId] = useState<string | null>(null);
+  // null até o primeiro efeito no navegador decidir (o servidor não sabe a largura da tela nem o localStorage)
+  const [visao, setVisao] = useState<Visao | null>(null);
+
+  useEffect(() => {
+    const salva = lerVisaoSalva();
+    if (salva) {
+      setVisao(salva);
+      return;
+    }
+    let estreita = false;
+    try {
+      estreita = window.matchMedia(CONSULTA_TELA_ESTREITA).matches;
+    } catch {
+      estreita = window.innerWidth < 768;
+    }
+    setVisao(estreita ? "lista" : "quadro");
+  }, []);
+
+  function escolherVisao(v: Visao) {
+    setVisao(v);
+    salvarVisao(v);
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -182,12 +202,18 @@ export function FunilBoard({
       })
       .eq("id", opportunityId);
 
-    if (!error) {
-      await supabase.from("opportunity_events").insert({
+    setErroMover(null);
+    if (error) {
+      setErroMover(`Não foi possível mover o lead: ${error.message}`);
+    } else {
+      const { error: erroEvento } = await supabase.from("opportunity_events").insert({
         opportunity_id: opportunityId,
         from_stage_id: current?.stage_id ?? null,
         to_stage_id: targetStageId,
       });
+      if (erroEvento) {
+        setErroMover(`O lead foi movido, mas o histórico da mudança não foi gravado: ${erroEvento.message}`);
+      }
       setItems((prev) =>
         prev.map((o) =>
           o.id === opportunityId ? { ...o, stage_id: targetStageId, loss_reason_id: lossReasonId ?? null } : o
@@ -201,6 +227,23 @@ export function FunilBoard({
     setActiveId(String(event.active.id));
   }
 
+  /**
+   * Caminho único para trocar de etapa, usado pelo arrastar (Quadro) e pelo "Mover ▾" (Lista):
+   * etapa de perda abre o modal que exige o motivo; as demais gravam direto em `moveStage`.
+   */
+  function solicitarMovimento(opportunityId: string, targetStageId: string) {
+    const stage = stages.find((s) => s.id === targetStageId);
+    if (!stage) return;
+    const current = items.find((o) => o.id === opportunityId);
+    if (!current || current.stage_id === targetStageId) return;
+    if (stage.is_lost) {
+      setLossModal({ opportunityId, targetStageId });
+      setSelectedReason("");
+      return;
+    }
+    moveStage(opportunityId, targetStageId);
+  }
+
   function handleDragEnd(event: DragEndEvent) {
     setActiveId(null);
     const { active, over } = event;
@@ -208,15 +251,7 @@ export function FunilBoard({
     setJustDraggedId(opportunityId);
     setTimeout(() => setJustDraggedId((cur) => (cur === opportunityId ? null : cur)), 300);
     if (!over) return;
-    const targetStageId = String(over.id);
-    const stage = stages.find((s) => s.id === targetStageId);
-    if (!stage) return;
-    if (stage.is_lost) {
-      setLossModal({ opportunityId, targetStageId });
-      setSelectedReason("");
-      return;
-    }
-    moveStage(opportunityId, targetStageId);
+    solicitarMovimento(opportunityId, String(over.id));
   }
 
   function confirmLoss() {
@@ -229,115 +264,143 @@ export function FunilBoard({
   const openOpportunity = openId ? items.find((o) => o.id === openId) : null;
   const hoje = hojeLocal();
 
+  const notesCountByOpportunity = useMemo(() => {
+    const out: Record<string, number> = {};
+    for (const [id, list] of Object.entries(notesByOpportunity)) out[id] = list.length;
+    return out;
+  }, [notesByOpportunity]);
+
+  // Enquanto `visao` é null (servidor e primeira pintura), as duas visões saem no HTML e o CSS mostra
+  // Lista abaixo de 768px e Quadro acima, que é o mesmo padrão do efeito: assim a tela não pisca.
+  const mostrarLista = visao === null || visao === "lista";
+  const mostrarQuadro = visao === null || visao === "quadro";
+
+  const botaoVisao = (v: Visao, rotulo: string) => {
+    const ativo = "bg-gold-500 text-white";
+    const inativo = "text-foreground hover:bg-muted";
+    // sem escolha ainda: o destaque segue a largura da tela, como o conteúdo
+    const classes =
+      visao === null
+        ? v === "lista"
+          ? "bg-gold-500 text-white md:bg-transparent md:text-foreground md:hover:bg-muted"
+          : "text-foreground hover:bg-muted md:bg-gold-500 md:text-white md:hover:bg-gold-500"
+        : visao === v
+          ? ativo
+          : inativo;
+    return (
+      <button
+        type="button"
+        aria-pressed={visao === null ? undefined : visao === v}
+        onClick={() => escolherVisao(v)}
+        className={`rounded px-3 py-1 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gold-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background ${classes}`}
+      >
+        {rotulo}
+      </button>
+    );
+  };
+
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="relative">
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {stages.map((stage) => {
-            const stageOpps = byStage.get(stage.id) ?? [];
-            const totalEstimado = stageOpps.reduce((acc, o) => acc + Number(o.estimated_value ?? 0), 0);
-
-            return (
-              <DroppableColumn key={stage.id} stage={stage}>
-                <div className="border-b border-border p-3">
-                  <p className="text-sm font-medium text-foreground">{stage.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {stageOpps.length} · {formatCurrency(totalEstimado)}
-                  </p>
-                </div>
-                <div className="space-y-2 p-2">
-                  {stageOpps.map((o) => {
-                    const opportunityNotes = notesByOpportunity[o.id] ?? [];
-                    const opportunityTags = tagsByOpportunity[o.id] ?? [];
-                    const opportunityTasks = tasksByOpportunity[o.id] ?? [];
-                    const tarefasAtrasadas = opportunityTasks.filter((t) => !t.done && t.due_date && t.due_date < hoje);
-                    const tarefasAbertas = opportunityTasks.filter((t) => !t.done);
-
-                    return (
-                      <DraggableCard
-                        key={o.id}
-                        opportunity={o}
-                        onOpen={() => setOpenId(o.id)}
-                        justDragged={justDraggedId === o.id}
-                      >
-                        {o.is_test && (
-                          <span className="mb-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-                            TESTE
-                          </span>
-                        )}
-                        <p className="font-medium text-foreground">{o.clients?.name ?? "Cliente"}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {o.sellers?.name ?? "sem vendedora"} · {formatCurrency(o.estimated_value)}
-                        </p>
-
-                        {opportunityTags.length > 0 && (
-                          <div className="mt-1.5 flex flex-wrap gap-1">
-                            {opportunityTags.map((t) => (
-                              <span
-                                key={t.id}
-                                className="rounded-full px-1.5 py-0.5 text-[10px] text-white"
-                                style={{ backgroundColor: t.color }}
-                              >
-                                {t.name}
-                              </span>
-                            ))}
-                          </div>
-                        )}
-
-                        <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
-                          {opportunityNotes.length > 0 && <span>📝 {opportunityNotes.length}</span>}
-                          {tarefasAbertas.length > 0 && (
-                            <span className={tarefasAtrasadas.length > 0 ? "font-medium text-destructive" : ""}>
-                              ☐ {tarefasAbertas.length}
-                              {tarefasAtrasadas.length > 0 ? " atrasada" : ""}
-                            </span>
-                          )}
-                        </div>
-
-                        {stage.is_won && !o.sale_id && (
-                          <Link
-                            href={`/vendas/novo?opportunityId=${o.id}&clientId=${o.client_id}${
-                              o.seller_id ? `&sellerId=${o.seller_id}` : ""
-                            }`}
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => e.stopPropagation()}
-                            className="mt-2 block rounded-md bg-gold-500 px-2 py-1 text-center text-xs font-medium text-white hover:bg-gold-600"
-                          >
-                            Registrar venda
-                          </Link>
-                        )}
-                        {stage.is_won && o.sale_id && (
-                          <p className="mt-2 text-xs font-medium text-gold-700 dark:text-gold-400">
-                            ✓ Venda registrada
-                          </p>
-                        )}
-                        {stage.is_lost && o.loss_reason_id && (
-                          <p className="mt-2 text-xs text-destructive">
-                            Motivo: {lossReasons.find((r) => r.id === o.loss_reason_id)?.name ?? "-"}
-                          </p>
-                        )}
-                      </DraggableCard>
-                    );
-                  })}
-                  {stageOpps.length === 0 && (
-                    <p className="px-2 py-4 text-center text-xs text-muted-foreground">Solte aqui</p>
-                  )}
-                </div>
-              </DroppableColumn>
-            );
-          })}
+      <div className="relative min-w-0 space-y-3">
+        {erroMover && (
+          <div role="alert" className="flex items-start justify-between gap-3 rounded-md border border-destructive bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            <p>{erroMover}</p>
+            <button type="button" onClick={() => setErroMover(null)} className="shrink-0 underline underline-offset-2">
+              Fechar
+            </button>
+          </div>
+        )}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div
+            role="group"
+            aria-label="Visão do funil"
+            className="inline-flex gap-1 rounded-md border border-border bg-surface p-1"
+          >
+            {botaoVisao("lista", "Lista")}
+            {botaoVisao("quadro", "Quadro")}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {visao === "lista"
+              ? "Toque no cartão para ver o lead ou use Mover para trocar de etapa."
+              : visao === "quadro"
+                ? "Arraste o cartão para outra coluna ou clique para ver o lead."
+                : null}
+          </p>
         </div>
 
-        <DragOverlay>
-          {activeOpportunity ? (
-            <div className="w-64 rounded-md border border-gold-500 bg-background p-3 text-sm shadow-soft">
-              <p className="font-medium text-foreground">{activeOpportunity.clients?.name ?? "Cliente"}</p>
-              <p className="text-xs text-muted-foreground">{formatCurrency(activeOpportunity.estimated_value)}</p>
-            </div>
-          ) : null}
-        </DragOverlay>
+        {mostrarLista && (
+          <div className={visao === null ? "md:hidden" : undefined}>
+            <FunilLista
+              stages={stages}
+              byStage={byStage}
+              notesCountByOpportunity={notesCountByOpportunity}
+              tagsByOpportunity={tagsByOpportunity}
+              tasksByOpportunity={tasksByOpportunity}
+              lossReasons={lossReasons}
+              hoje={hoje}
+              busyId={busyId}
+              onOpen={(id) => setOpenId(id)}
+              onMover={solicitarMovimento}
+            />
+          </div>
+        )}
 
-        {busyId && <p className="mt-2 text-xs text-muted-foreground">Movendo...</p>}
+        {mostrarQuadro && (
+          <div className={visao === null ? "hidden md:block" : undefined}>
+            <div className="flex gap-4 overflow-x-auto pb-4">
+              {stages.map((stage) => {
+                const stageOpps = byStage.get(stage.id) ?? [];
+                const totalEstimado = stageOpps.reduce((acc, o) => acc + Number(o.estimated_value ?? 0), 0);
+
+                return (
+                  <DroppableColumn key={stage.id} stage={stage}>
+                    <div className="border-b border-border p-3">
+                      <p className="text-sm font-medium text-foreground">{stage.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {stageOpps.length} · {formatCurrency(totalEstimado)}
+                      </p>
+                    </div>
+                    <div className="space-y-2 p-2">
+                      {stageOpps.map((o) => (
+                        <DraggableCard
+                          key={o.id}
+                          opportunity={o}
+                          onOpen={() => setOpenId(o.id)}
+                          justDragged={justDraggedId === o.id}
+                        >
+                          <FunilCardInfo
+                            opportunity={o}
+                            stage={stage}
+                            notesCount={notesCountByOpportunity[o.id] ?? 0}
+                            tags={tagsByOpportunity[o.id] ?? []}
+                            tasks={tasksByOpportunity[o.id] ?? []}
+                            lossReasons={lossReasons}
+                            hoje={hoje}
+                          />
+                          {stage.is_won && !o.sale_id && <RegistrarVendaLink opportunity={o} className="mt-2" />}
+                        </DraggableCard>
+                      ))}
+                      {stageOpps.length === 0 && (
+                        <p className="px-2 py-4 text-center text-xs text-muted-foreground">Solte aqui</p>
+                      )}
+                    </div>
+                  </DroppableColumn>
+                );
+              })}
+            </div>
+
+            <DragOverlay>
+              {activeOpportunity ? (
+                <div className="w-64 rounded-md border border-gold-500 bg-background p-3 text-sm shadow-soft">
+                  <p className="font-medium text-foreground">{activeOpportunity.clients?.name ?? "Cliente"}</p>
+                  <p className="text-xs text-muted-foreground">{formatCurrency(activeOpportunity.estimated_value)}</p>
+                </div>
+              ) : null}
+            </DragOverlay>
+
+            {busyId && <p className="mt-2 text-xs text-muted-foreground">Movendo...</p>}
+          </div>
+        )}
       </div>
 
       {lossModal && (
