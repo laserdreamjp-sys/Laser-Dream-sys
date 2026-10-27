@@ -18,6 +18,11 @@
 --    leads, orçamentos nem pacotes no banco, porque ele não os recarrega.
 -- 7. O histórico de alterações não é apagado nem recarregado; a restauração
 --    grava uma linha de resumo nele.
+-- 8. Tabelas fora do backup que apontam para as restauradas são preservadas:
+--    cpf_import_staging.match_client_id (zerado para permitir apagar clientes e
+--    devolvido no fim) e, no formato version 2, sales_history (apagado em cascata
+--    junto com as vendas) e client_merge_log.kept_client_id (zerado pelo
+--    ON DELETE SET NULL); ambos são guardados e devolvidos.
 
 create or replace function public.restore_from_backup(payload jsonb)
  returns jsonb
@@ -102,6 +107,18 @@ begin
 
   perform set_config('laser.sem_movimentacao', 'on', true);
 
+  -- Guarda o que a exclusão em cascata ou o SET NULL destruiria e o backup não traz.
+  drop table if exists pg_temp.rb_staging;
+  create temp table rb_staging on commit drop as
+    select id, match_client_id from cpf_import_staging where match_client_id is not null;
+  if v_versao = 2 then
+    drop table if exists pg_temp.rb_sales_history;
+    create temp table rb_sales_history on commit drop as select * from sales_history;
+    drop table if exists pg_temp.rb_merge_log;
+    create temp table rb_merge_log on commit drop as
+      select id, kept_client_id from client_merge_log where kept_client_id is not null;
+  end if;
+
   alter table sales disable trigger trg_sale_cash_sync;
   alter table sales disable trigger trg_sales_classify;
   alter table sales disable trigger trg_sales_audit;
@@ -141,6 +158,18 @@ begin
        set sale_id = x.sale_id
       from jsonb_to_recordset(payload -> 'tables' -> 'opportunities') as x(id uuid, sale_id uuid)
      where o.id = x.id and x.sale_id is not null;
+  end if;
+
+  -- Devolve o que foi guardado, quando o registro de destino ainda existe.
+  update cpf_import_staging s set match_client_id = b.match_client_id
+    from rb_staging b
+   where s.id = b.id and exists (select 1 from clients c where c.id = b.match_client_id);
+  if v_versao = 2 then
+    insert into sales_history
+      select h.* from rb_sales_history h where exists (select 1 from sales x where x.id = h.sale_id);
+    update client_merge_log m set kept_client_id = b.kept_client_id
+      from rb_merge_log b
+     where m.id = b.id and exists (select 1 from clients c where c.id = b.kept_client_id);
   end if;
 
   alter table sales enable trigger trg_sale_cash_sync;
