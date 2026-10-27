@@ -21,7 +21,7 @@ Sistema de gestão de clínica (vendas, caixa, clientes, funil comercial, orçam
 
 Variáveis de ambiente (`.env.local` e painel da Vercel): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (somente servidor, usada pelos crons via `createServiceClient`), `CRON_SECRET`. Nunca expor a service role no cliente nem commitar valores.
 
-Banco: Supabase, projeto `nlhohtbgtiuqyhewbjnu` (`laser-dream-os`, `sa-east-1`). Mudanças de schema são migrações numeradas (última: 0046, ainda não aplicada); a partir da 0042 o SQL fica em `supabase/migrations/NNNN_nome.sql` e é aplicado com o mesmo nome no Supabase. Toda tabela nova precisa de `organization_id`, RLS habilitada e policies que usem `current_organization_id()`, `is_admin()`, `is_manager()` e `current_unit_ids()`.
+Banco: Supabase, projeto `nlhohtbgtiuqyhewbjnu` (`laser-dream-os`, `sa-east-1`). Mudanças de schema são migrações numeradas (última: 0046); a partir da 0042 o SQL fica em `supabase/migrations/NNNN_nome.sql` e é aplicado com o mesmo nome no Supabase. Toda tabela nova precisa de `organization_id`, RLS habilitada e policies que usem `current_organization_id()`, `is_admin()`, `is_manager()` e `current_unit_ids()`.
 
 ## 2. Stack
 
@@ -127,7 +127,7 @@ Triggers: `trg_sales_classify` (BEFORE INSERT em `sales`), `trg_sales_audit` (AF
 
 ## 9. Pontos de atenção atuais
 
-Resumo dos riscos de `ARCHITECTURE.md` 1.6: (1) não existe backup salvo em lugar algum; (2) resolvido: `buildBackupPayload` pagina, grava `counts` (formato `version: 3`, 32 tabelas) e falha se faltar linha, mas backups `version: 1` podem estar truncados; (3) resolvido na 0042: um só trigger lança a entrada de caixa da venda; (4) organização fixa no código; (5) resolvido na 0044: `anon` sem acesso a tabelas, só `get_invite_by_token` aberta; (9) resolvido: datas no fuso de Brasília; (14) resolvido: listas grandes paginadas com `buscarTodas`; (15) resolvido na 0045: histórico de alterações ativo, tela `/movimentacoes`; (16) backup de 32 tabelas e restauração nova na 0046: pronta, em teste, **não aplicar o código na `main` antes de aplicar a 0046 no Supabase**. A restauração recusa backup `version: 1` e backup cujo `counts` não bata com `tables`.
+Resumo dos riscos de `ARCHITECTURE.md` 1.6: (1) não existe backup salvo em lugar algum; (2) resolvido: `buildBackupPayload` pagina, grava `counts` (formato `version: 3`, 32 tabelas) e falha se faltar linha, mas backups `version: 1` podem estar truncados; (3) resolvido na 0042: um só trigger lança a entrada de caixa da venda; (4) organização fixa no código; (5) resolvido na 0044: `anon` sem acesso a tabelas, só `get_invite_by_token` aberta; (9) resolvido: datas no fuso de Brasília; (14) resolvido: listas grandes paginadas com `buscarTodas`; (15) resolvido na 0045: histórico de alterações ativo, tela `/movimentacoes`; (16) resolvido na 0046: backup de 32 tabelas e restauração nova, aplicada e testada com dados reais; a restauração leva ~5 s e o limite da chamada logada é 8 s (ver risco 16 em `ARCHITECTURE.md`). A restauração recusa backup `version: 1` e backup cujo `counts` não bata com `tables`.
 
 ## 10. Como manter este arquivo
 
