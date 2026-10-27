@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
-import { BACKUP_TABLES, buildBackupPayload } from "@/lib/backup";
+import { buildBackupPayload, validarPayloadParaRestaurar } from "@/lib/backup";
 
 export async function POST(request: NextRequest) {
   const supabase = createClient();
@@ -50,31 +50,21 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const payload = JSON.parse(await file.text());
-
-  // Trava: só restaura backup completo e conferível. O restore apaga as tabelas
-  // antes de recarregar, então um arquivo truncado destruiria dados.
-  if (payload?.version !== 2 || !payload.counts || !payload.tables) {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(await file.text());
+  } catch {
     return NextResponse.json(
-      {
-        error:
-          "Este backup é de um formato antigo (version 1) e pode estar incompleto, com no máximo 1.000 linhas por tabela. Restauração cancelada. Gere um backup novo e restaure a partir dele.",
-      },
+      { error: "O arquivo de backup está corrompido e não pôde ser lido. Restauração cancelada; nenhum dado foi alterado." },
       { status: 400 }
     );
   }
 
-  for (const table of BACKUP_TABLES) {
-    const rows = payload.tables[table];
-    const expected = payload.counts[table];
-    if (!Array.isArray(rows) || typeof expected !== "number" || rows.length !== expected) {
-      return NextResponse.json(
-        {
-          error: `Backup inconsistente na tabela ${table}: o arquivo registra ${expected ?? "sem contagem"} linhas e contém ${Array.isArray(rows) ? rows.length : "nenhuma lista"}. Restauração cancelada; nenhum dado foi alterado.`,
-        },
-        { status: 400 }
-      );
-    }
+  // Trava: só restaura backup completo e conferível. O restore apaga as tabelas
+  // antes de recarregar, então um arquivo truncado destruiria dados.
+  const validacao = validarPayloadParaRestaurar(payload);
+  if (!validacao.ok) {
+    return NextResponse.json({ error: validacao.erro }, { status: 400 });
   }
 
   // Rede de segurança: salva o estado atual antes de sobrescrever.
