@@ -25,6 +25,13 @@ export const BACKUP_TABLES = [
   "change_requests",
 ] as const;
 
+/** Nome do arquivo de um backup, a partir do caminho no Storage (`<org>/backup-<carimbo>.json`). */
+export function nomeDoArquivoDeBackup(storagePath: string): string {
+  const nome = storagePath.split("/").pop() ?? "";
+  const limpo = nome.replace(/[^A-Za-z0-9._-]/g, "_");
+  return limpo.length > 0 ? limpo : "backup.json";
+}
+
 export type BackupTable = (typeof BACKUP_TABLES)[number];
 
 /**

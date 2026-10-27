@@ -114,7 +114,8 @@ Triggers: `trg_sales_classify` (BEFORE INSERT em `sales`), `trg_sales_audit` (AF
 | Rota | Acesso | Função |
 |---|---|---|
 | `POST /api/backup/generate` | Administrador | Backup manual |
-| `GET /api/backup/list` | Administrador | Lista backups com URL assinada |
+| `GET /api/backup/list` | Administrador | Lista backups com o link de download |
+| `GET /api/backup/download/[id]` | Administrador | Entrega o backup como anexo (arquivo repassado em fluxo, `Content-Disposition: attachment`) |
 | `POST /api/backup/restore` | Administrador | Restaura (exige `confirm = "RESTAURAR"`; recusa backup `version: 1` ou com `counts` divergente; faz backup de segurança antes) |
 | `GET /api/cron/backup` | Bearer `CRON_SECRET` | Backup diário às 06:00 UTC, retenção de 30 dias |
 | `GET /api/cron/funil-automacoes` | Bearer `CRON_SECRET` | Tarefas e etiquetas do funil e expiração de orçamentos, 09:00 UTC |

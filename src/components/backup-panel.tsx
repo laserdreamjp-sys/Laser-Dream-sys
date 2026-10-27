@@ -126,6 +126,7 @@ export function BackupPanel() {
                     {b.download_url && (
                       <a
                         href={b.download_url}
+                        download
                         className="text-xs text-gold-700 underline underline-offset-2 dark:text-gold-400"
                       >
                         Baixar
