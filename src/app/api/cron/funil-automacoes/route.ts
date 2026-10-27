@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { dataLocal, hojeLocal, somarDias } from "@/lib/datas";
 
 const ORGANIZATION_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -77,15 +78,13 @@ export async function GET(request: NextRequest) {
   }
 
   // ===== regra 2: confirmacao de avaliacao marcada para amanha =====
-  const amanha = new Date(agora);
-  amanha.setDate(amanha.getDate() + 1);
-  const amanhaStr = amanha.toISOString().slice(0, 10);
+  const amanhaStr = somarDias(hojeLocal(), 1);
   for (const o of oppsAbertas) {
     if (!o.data_avaliacao) continue;
-    const dataAval = o.data_avaliacao.slice(0, 10);
+    const dataAval = dataLocal(new Date(o.data_avaliacao));
     if (dataAval !== amanhaStr) continue;
     if (temTarefaAberta(o.id, "confirmar_avaliacao")) continue;
-    await criarTarefa(o.id, "Confirmar avaliação marcada para amanhã", agora.toISOString().slice(0, 10), "confirmar_avaliacao");
+    await criarTarefa(o.id, "Confirmar avaliação marcada para amanhã", hojeLocal(), "confirmar_avaliacao");
   }
 
   // ===== sequencia de follow-up: comeca 1 dia depois de ENTRAR na etapa "Tentativa de contato"
@@ -134,7 +133,7 @@ export async function GET(request: NextRequest) {
     await criarTarefa(
       o.id,
       "Confirmar follow-up 1 — você entrou em contato de novo?",
-      agora.toISOString().slice(0, 10),
+      hojeLocal(),
       "followup_confirmar_1"
     );
   }
@@ -157,7 +156,7 @@ export async function GET(request: NextRequest) {
     if (o.loss_reasons?.name !== "Sumiu") continue;
     if (diffDias(o.updated_at, agora) < 30) continue;
     if (temTarefaAberta(o.id, "reativacao_sumiu")) continue;
-    await criarTarefa(o.id, "Tentar reativar — sumiu há 30 dias, vale uma nova tentativa", agora.toISOString().slice(0, 10), "reativacao_sumiu");
+    await criarTarefa(o.id, "Tentar reativar — sumiu há 30 dias, vale uma nova tentativa", hojeLocal(), "reativacao_sumiu");
   }
 
   // ===== bonus: lead esfriando (7+ dias sem nenhuma atividade) ganha a etiqueta "Aguardando decisão" =====
@@ -180,7 +179,7 @@ export async function GET(request: NextRequest) {
   }
 
   // ===== bonus: orcamento aberto que passou da validade vira "expirado" sozinho =====
-  const hojeStr = agora.toISOString().slice(0, 10);
+  const hojeStr = hojeLocal();
   const { data: expirados } = await supabase
     .from("budgets")
     .update({ status: "expirado", updated_at: agora.toISOString() })

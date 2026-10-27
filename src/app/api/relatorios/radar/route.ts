@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
 import { suggestedMessage } from "@/components/radar-client-card";
+import { buscarTodas } from "@/lib/buscar-todas";
 
 function csvEscape(value: unknown) {
   const str = String(value ?? "");
@@ -30,13 +31,21 @@ export async function GET() {
     return NextResponse.json({ error: "Apenas o administrador pode exportar relatórios." }, { status: 403 });
   }
 
-  const { data, error } = await supabase
-    .from("client_intelligence")
-    .select("name, phone, dias_desde_ultima, valor_total, total_compras, ticket_medio, ultima_compra, bucket")
-    .order("valor_total", { ascending: false });
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+  let data: unknown[];
+  try {
+    data = await buscarTodas(
+      (de, ate) =>
+        supabase
+          .from("client_intelligence")
+          .select("name, phone, dias_desde_ultima, valor_total, total_compras, ticket_medio, ultima_compra, bucket")
+          .order("valor_total", { ascending: false })
+          .order("client_id")
+          .order("unit_id")
+          .range(de, ate),
+      "o radar de clientes"
+    );
+  } catch (err) {
+    return NextResponse.json({ error: (err as Error).message }, { status: 400 });
   }
 
   type Row = {

@@ -19,6 +19,7 @@ import {
   Radar,
   Kanban,
   Receipt,
+  History,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -36,6 +37,7 @@ const NAV_ITEMS = [
   { href: "/solicitacoes", label: "Solicitações", icon: Bell },
   { href: "/usuarios", label: "Usuários", icon: UserCog },
   { href: "/configuracoes", label: "Configurações", icon: Settings },
+  { href: "/movimentacoes", label: "Histórico", icon: History, somenteAdmin: true },
 ];
 
 function initials(name: string) {
@@ -71,7 +73,7 @@ export function Sidebar({ fullName, roleName }: { fullName: string; roleName: st
   function NavLinks() {
     return (
       <nav className="space-y-0.5">
-        {NAV_ITEMS.map((item) => {
+        {NAV_ITEMS.filter((item) => !item.somenteAdmin || roleName === "Administrador").map((item) => {
           const active = pathname.startsWith(item.href);
           const Icon = item.icon;
           return (

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { hojeLocal } from "@/lib/datas";
 
 type Tag = { id: string; name: string; color: string };
 type Task = {
@@ -390,7 +391,7 @@ export function LeadDetailModal({
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">Tarefas</p>
             <div className="space-y-1.5">
               {localTasks.map((t) => {
-                const atrasada = !t.done && t.due_date && t.due_date < new Date().toISOString().slice(0, 10);
+                const atrasada = !t.done && t.due_date && t.due_date < hojeLocal();
                 return (
                   <label
                     key={t.id}

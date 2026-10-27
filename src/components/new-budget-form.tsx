@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { hojeLocal, somarDias } from "@/lib/datas";
 import { ClientAutocomplete } from "@/components/client-autocomplete";
 import { isModoTesteAtivo } from "@/components/test-mode-toggle";
 
@@ -57,11 +58,7 @@ export function NewBudgetForm({
   const [descontoValor, setDescontoValor] = useState("");
   const [descontoPercentual, setDescontoPercentual] = useState("");
   const [notes, setNotes] = useState("");
-  const [validoAte, setValidoAte] = useState(() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 7);
-    return d.toISOString().slice(0, 10);
-  });
+  const [validoAte, setValidoAte] = useState(() => somarDias(hojeLocal(), 7));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

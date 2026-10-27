@@ -13,14 +13,15 @@ Sistema de gestão de clínica (vendas, caixa, clientes, funil comercial, orçam
 | Build de produção (inclui checagem de tipos) | `npm run build` |
 | Servir o build | `npm run start` |
 | Lint (ESLint padrão do Next) | `npm run lint` |
-| Testes | não existem; validar com `npm run build` e `npm run lint` e testar a tela no modo teste |
+| Testes | `npm test` (vitest; um arquivo: `npx vitest run src/lib/datas.test.ts`). Regras puras novas em `src/lib/` ganham teste `*.test.ts` ao lado. Antes de publicar: `npm test` e `npm run build` |
+| Página de SQL para o dono rodar (seção 12) | `python3 scripts/gerar-pagina-sql.py saida.html supabase/migrations/NNNN.sql --titulo ... --conferencia "select ..." --esperado coluna=valor` e publicar com a ferramenta Artifact |
 | Auditar embeds ambíguos do Supabase | `python3 scripts/audit_embeds.py` (usa `scripts/fk_map.json`) |
 | Deploy | push na branch `main` dispara deploy na Vercel; os crons vêm de `vercel.json` |
 | Disparar cron manualmente | `curl -H "Authorization: Bearer $CRON_SECRET" https://<dominio>/api/cron/backup` e `/api/cron/funil-automacoes` |
 
 Variáveis de ambiente (`.env.local` e painel da Vercel): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (somente servidor, usada pelos crons via `createServiceClient`), `CRON_SECRET`. Nunca expor a service role no cliente nem commitar valores.
 
-Banco: Supabase, projeto `nlhohtbgtiuqyhewbjnu` (`laser-dream-os`, `sa-east-1`). Mudanças de schema são migrações numeradas (última conhecida: 0041). Toda tabela nova precisa de `organization_id`, RLS habilitada e policies que usem `current_organization_id()`, `is_admin()`, `is_manager()` e `current_unit_ids()`.
+Banco: Supabase, projeto `nlhohtbgtiuqyhewbjnu` (`laser-dream-os`, `sa-east-1`). Mudanças de schema são migrações numeradas (última: 0045); a partir da 0042 o SQL fica em `supabase/migrations/NNNN_nome.sql` e é aplicado com o mesmo nome no Supabase. Toda tabela nova precisa de `organization_id`, RLS habilitada e policies que usem `current_organization_id()`, `is_admin()`, `is_manager()` e `current_unit_ids()`.
 
 ## 2. Stack
 
@@ -36,16 +37,20 @@ Next.js 14.2.35 (App Router), React 18.3, TypeScript 5.5 em modo estrito, Tailwi
 6. Embeds do PostgREST com mais de uma FK entre as tabelas devem usar o nome da FK (sintaxe `tabela!nome_da_fkey` dentro do `select`); conferir com `scripts/audit_embeds.py`.
 7. Toda consulta de leitura em página deve passar por `unwrap(await consulta, "contexto")` de `src/lib/unwrap.ts`, que lança erro em vez de devolver lista vazia quando a consulta falha (evita tela zerada silenciosa).
 8. Dados de teste: gravar com `is_test` vindo do modo teste (`localStorage` chave `laser_dream_modo_teste`, evento `modo-teste-mudou`); `limpar_dados_de_teste` apaga esses registros.
-9. Dinheiro em `numeric`; datas de venda e caixa em `date`; evitar `new Date().toISOString().slice(0,10)` para "hoje", pois usa UTC (ver risco 9 em `ARCHITECTURE.md` 1.6).
-10. Caixa: dia com `cash_closures` fechado bloqueia INSERT, UPDATE e DELETE em `cash_transactions` (trigger `trg_block_closed_day`).
-11. Rotas de cron validam `Authorization: Bearer CRON_SECRET` e usam a organização fixa `00000000-0000-0000-0000-000000000001`.
-12. Não criar migração, trigger ou função que repita efeito já existente. Antes de mexer em venda ou caixa, ler os triggers de `sales` e `cash_transactions` em `ARCHITECTURE.md` 1.2.4 e o risco 3 de 1.6.
+9. Dinheiro em `numeric`; datas de venda e caixa em `date`. "Hoje", "amanhã" e o mês corrente sempre por `hojeLocal`, `somarDias`, `mesAtualLocal`, `primeiroDiaDoMesLocal` e `dataLocal` de `src/lib/datas.ts` (fuso de Brasília); nunca `toISOString().slice(0,10)`, que dá a data em UTC.
+10. Lista que pode passar de 1.000 linhas (clientes, vendas, `client_intelligence`, áreas de venda, caixa, exportações) usa `buscarTodas` de `src/lib/buscar-todas.ts`, com ordem estável terminando em coluna única. O Supabase corta em 1.000 sem erro.
+11. Caixa: dia com `cash_closures` fechado bloqueia INSERT, UPDATE e DELETE em `cash_transactions` (trigger `trg_block_closed_day`).
+12. Rotas de cron validam `Authorization: Bearer CRON_SECRET` e usam a organização fixa `00000000-0000-0000-0000-000000000001`.
+13. Não criar migração, trigger ou função que repita efeito já existente. Antes de mexer em venda ou caixa, ler os triggers de `sales` e `cash_transactions` em `ARCHITECTURE.md` 1.2.4 e o risco 3 de 1.6.
+14. Segurança: tabela nova não concede nada a `anon` (padrão fechado pela 0044); função nova termina com `revoke execute on function <nome> from public, anon;` e `grant execute ... to authenticated, service_role;`, e função de gatilho também sem `authenticated`. Só `get_invite_by_token` é aberta para `anon`. Serviço externo novo no navegador precisa entrar na CSP de `next.config.mjs`.
+15. Senha de usuário passa por `problemaSenha` de `src/lib/senha.ts` (8 caracteres, minúscula, maiúscula e número) antes de `signUp` ou troca de senha.
+16. Funil: mover lead passa sempre por `solicitarMovimento` em `funil-board.tsx` (Lista com "Mover ▾" e Quadro com arrastar usam o mesmo caminho e a mesma regra de motivo de perda); a visão escolhida fica em `localStorage` `laser_dream_funil_visao`.
 
 ## 4. Papéis
 
 `Administrador` (tudo), `Gerente` (visão da organização, caixa das suas unidades, catálogos), qualquer outro papel (vendas das suas unidades; edição e exclusão via `change_requests`).
 
-## 5. Banco de dados: referência rápida (41 tabelas, schema `public`)
+## 5. Banco de dados: referência rápida (42 tabelas, schema `public`)
 
 Formato: coluna→tabela indica chave estrangeira. `organization_id` aparece em quase todas e aponta para `organizations`. Dicionário completo (tipos, obrigatoriedade, defaults, RLS, índices) em `ARCHITECTURE.md` 1.2.
 
@@ -66,6 +71,7 @@ Formato: coluna→tabela indica chave estrangeira. `organization_id` aparece em 
 | `funnels` | `id` | `id`, `organization_id`, `name`, `position`, `active`, `created_at` |
 | `invites` | `id` | `id`, `organization_id`, `email`, `role_id`→roles, `unit_id`→units, `token`, `status`, `expires_at`, `created_by`→profiles, `created_at` |
 | `lead_origins` | `id` | `id`, `organization_id`, `name`, `code`, `active`, `created_at` |
+| `movimentacoes` | `id` | `id`, `organization_id`, `ocorrido_em`, `usuario_id`→profiles, `usuario_nome`, `acao`, `entidade`, `entidade_id`, `descricao`, `detalhes` |
 | `loss_reasons` | `id` | `id`, `organization_id`, `name`, `active` |
 | `opportunities` | `id` | `id`, `organization_id`, `unit_id`→units, `client_id`→clients, `stage_id`→pipeline_stages, `seller_id`→sellers, `lead_origin_id`→lead_origins, `estimated_value`, `notes`, `loss_reason_id`→loss_reasons, `sale_id`→sales, `created_by`→profiles, `created_at`, `updated_at`, `referred_by_name`, `interesse_procedure_id`→procedures, `data_avaliacao`, `is_test` |
 | `opportunity_areas` | `opportunity_id,area_id` | `opportunity_id`→opportunities, `area_id`→procedure_areas |
@@ -99,9 +105,9 @@ View: `client_intelligence` (`security_invoker`, uma linha por cliente e unidade
 
 RPCs chamadas pela aplicação: `get_invite_by_token`, `buscar_clientes_parecidos`, `scan_duplicates`, `merge_clients`, `permanent_delete_sale`, `limpar_dados_de_teste`, `restore_from_backup`.
 
-Funções de apoio a RLS: `current_organization_id`, `current_unit_ids`, `is_admin`, `is_manager`. Outras: `is_valid_cpf`, `classify_cpf_import`, `apply_cpf_import`, `avancar_followup`, `fn_block_closed_day`, `fn_handle_new_user`, `fn_sale_cash_sync`, `fn_sales_audit`, `fn_sales_classify`, `lancar_entrada_caixa_venda`, `reverter_entrada_caixa_venda_cancelada`.
+Funções de apoio a RLS: `current_organization_id`, `current_unit_ids`, `is_admin`, `is_manager`. Outras: `is_valid_cpf`, `classify_cpf_import`, `apply_cpf_import`, `avancar_followup`, `fn_block_closed_day`, `fn_handle_new_user`, `fn_sale_cash_sync`, `fn_sales_audit`, `fn_sales_classify`, `fn_registrar_movimentacao`.
 
-Triggers: `trg_sales_classify` (BEFORE INSERT em `sales`), `trg_sales_audit` (AFTER UPDATE em `sales`), `trg_sale_cash_sync` (AFTER INSERT e UPDATE em `sales`), `trg_lancar_entrada_caixa_venda` (AFTER INSERT em `sales`), `trg_reverter_entrada_caixa_venda_cancelada` (AFTER UPDATE em `sales`), `trg_block_closed_day` (BEFORE INSERT, UPDATE e DELETE em `cash_transactions`), `trg_avancar_followup` (AFTER UPDATE em `opportunity_tasks`), `trg_handle_new_user` (AFTER INSERT em `auth.users`).
+Triggers: `trg_sales_classify` (BEFORE INSERT em `sales`), `trg_sales_audit` (AFTER UPDATE em `sales`), `trg_sale_cash_sync` (AFTER INSERT e UPDATE em `sales`, única origem da entrada de caixa de venda em dinheiro; índice único parcial `uq_cash_transactions_sale_id` garante uma entrada por venda), `trg_block_closed_day` (BEFORE INSERT, UPDATE e DELETE em `cash_transactions`), `trg_movimentacao` (AFTER INSERT, UPDATE e DELETE em 18 tabelas, grava `movimentacoes`; tabela nova com dado de negócio ganha esse gatilho), `trg_avancar_followup` (AFTER UPDATE em `opportunity_tasks`), `trg_handle_new_user` (AFTER INSERT em `auth.users`).
 
 ## 7. Rotas de API e crons
 
@@ -109,19 +115,89 @@ Triggers: `trg_sales_classify` (BEFORE INSERT em `sales`), `trg_sales_audit` (AF
 |---|---|---|
 | `POST /api/backup/generate` | Administrador | Backup manual |
 | `GET /api/backup/list` | Administrador | Lista backups com URL assinada |
-| `POST /api/backup/restore` | Administrador | Restaura (exige `confirm = "RESTAURAR"`, faz backup de segurança antes) |
+| `POST /api/backup/restore` | Administrador | Restaura (exige `confirm = "RESTAURAR"`; recusa backup `version: 1` ou com `counts` divergente; faz backup de segurança antes) |
 | `GET /api/cron/backup` | Bearer `CRON_SECRET` | Backup diário às 06:00 UTC, retenção de 30 dias |
 | `GET /api/cron/funil-automacoes` | Bearer `CRON_SECRET` | Tarefas e etiquetas do funil e expiração de orçamentos, 09:00 UTC |
 | `GET /api/relatorios/vendas`, `clientes-completo`, `clientes-procedimentos`, `radar` | Administrador | Exportações CSV |
 
 ## 8. Telas
 
-`/login`, `/convite/[token]`, `/dashboard`, `/vendas`, `/vendas/novo`, `/caixa`, `/clientes`, `/clientes/[id]`, `/funil`, `/orcamentos`, `/orcamentos/novo`, `/orcamentos/[id]`, `/radar`, `/relatorios`, `/relatorios/funil`, `/solicitacoes`, `/usuarios`, `/configuracoes`. Regras de cada uma em `ARCHITECTURE.md` 1.3.
+`/login`, `/convite/[token]`, `/dashboard`, `/vendas`, `/vendas/novo`, `/caixa`, `/clientes`, `/clientes/[id]`, `/funil`, `/orcamentos`, `/orcamentos/novo`, `/orcamentos/[id]`, `/radar`, `/relatorios`, `/relatorios/funil`, `/solicitacoes`, `/usuarios`, `/configuracoes`, `/movimentacoes` (Histórico, só Administrador). Regras de cada uma em `ARCHITECTURE.md` 1.3.
 
 ## 9. Pontos de atenção atuais
 
-Resumo dos riscos de `ARCHITECTURE.md` 1.6: (1) não existe backup salvo em lugar algum; (2) `buildBackupPayload` não pagina e pode truncar em 1.000 linhas por tabela; (3) venda em dinheiro dispara dois triggers que inserem entrada de caixa; (4) organização fixa no código; (5) funções `SECURITY DEFINER` executáveis por `anon`. Não restaurar backup sem conferir a contagem de linhas por tabela.
+Resumo dos riscos de `ARCHITECTURE.md` 1.6: (1) não existe backup salvo em lugar algum; (2) resolvido: `buildBackupPayload` pagina, grava `counts` (formato `version: 2`) e falha se faltar linha, mas backups `version: 1` podem estar truncados; (3) resolvido na 0042: um só trigger lança a entrada de caixa da venda; (4) organização fixa no código; (5) resolvido na 0044: `anon` sem acesso a tabelas, só `get_invite_by_token` aberta; (9) resolvido: datas no fuso de Brasília; (14) resolvido: listas grandes paginadas com `buscarTodas`; (15) resolvido na 0045: histórico de alterações ativo, tela `/movimentacoes`. A restauração recusa backup `version: 1` e backup cujo `counts` não bata com `tables`.
 
 ## 10. Como manter este arquivo
 
 Ao criar, editar ou remover tabela, coluna, função, trigger, rota ou funcionalidade: atualizar a seção correspondente de `ARCHITECTURE.md` (1.2 dicionário, 1.3 funcionalidades, 1.4 matriz, 1.5 integrações), atualizar a tabela da seção 5 e as listas das seções 6 a 8 deste arquivo, e commitar tudo junto.
+
+## 11. Papel do agente principal: liderança e coordenação
+
+O agente principal lidera e coordena a equipe de agentes subordinados. Ele está acima dos demais e responde pelo resultado final de toda tarefa, inclusive das partes executadas por outros agentes.
+
+### 11.1 Princípio geral
+
+1. Delegar é o procedimento padrão. Sempre que um agente subordinado tiver capacidade para executar uma tarefa ou parte dela, o agente principal deve delegá-la em vez de executá-la.
+2. A delegação nunca pode comprometer a qualidade, a segurança nem a conclusão da tarefa. Quando houver conflito entre delegar e proteger um desses três pontos, prevalece a proteção.
+3. Delegar não transfere a responsabilidade. O agente principal continua responsável pelo resultado final, e um erro entregue por um subordinado e não detectado é um erro do agente principal.
+4. O agente principal só usa os agentes e as capacidades que de fato existem no ambiente. Não deve presumir que um agente consegue executar algo sem que isso esteja confirmado.
+
+### 11.2 Antes de agir
+
+Antes de iniciar qualquer tarefa, o agente principal deve:
+
+1. Entender o objetivo e o critério de sucesso da tarefa.
+2. Dividir a tarefa em partes e identificar quais podem ser delegadas.
+3. Escolher, para cada parte delegável, o agente mais adequado à natureza do trabalho.
+4. Identificar dependências entre as partes e definir a ordem de execução. Partes independentes devem ser delegadas ao mesmo tempo.
+5. Separar as partes que ele mesmo deve executar (ver 11.5).
+
+### 11.3 Como delegar
+
+Cada delegação deve conter, de forma explícita:
+
+1. **Instrução clara:** o que deve ser feito, em linguagem objetiva e sem ambiguidade.
+2. **Contexto suficiente:** o objetivo maior da tarefa, o que já foi apurado, os arquivos ou dados relevantes e as regras do projeto que se aplicam (por exemplo, as regras deste arquivo e do `ARCHITECTURE.md`). O subordinado não enxerga a conversa do agente principal; o que não for informado será desconhecido para ele.
+3. **Resultado esperado:** o que deve ser entregue, em que formato e com qual critério de aceitação.
+4. **Limites:** o que o agente não deve alterar e quais ações exigem aprovação prévia.
+
+Não delegar a compreensão do problema. O agente principal define o que precisa ser resolvido; o subordinado executa.
+
+### 11.4 Acompanhamento, revisão e integração
+
+1. Acompanhar o andamento das tarefas delegadas e tratar sem demora qualquer bloqueio ou desvio.
+2. Tratar todo resultado recebido como informação a ser verificada, nunca como verdade. Antes de aceitar, conferir se o resultado cumpre o pedido, se está correto e se respeita as regras do projeto.
+3. Verificar a consistência entre as entregas de agentes diferentes e entre cada entrega e o restante do sistema.
+4. Quando o resultado for insuficiente ou incorreto, devolver ao agente com a correção necessária ou corrigir diretamente.
+5. Integrar as partes em um único resultado coerente e validar o conjunto antes de entregar ao usuário.
+6. Relatar ao usuário o que foi concluído, o que não foi, o que foi alterado e quais problemas ocorreram, sem omitir falhas.
+
+### 11.5 Quando o agente principal age diretamente
+
+O agente principal deve executar ou intervir diretamente quando:
+
+1. A tarefa não puder ser delegada porque nenhum agente disponível tem capacidade para ela.
+2. A tarefa exigir decisão de coordenação, como priorização, resolução de conflito entre entregas, escolha entre alternativas ou definição de escopo.
+3. A tarefa apresentar risco relevante, como perda de dados, alteração irreversível, ação em produção, segurança ou dinheiro. Nesses casos ele conduz a ação ou a supervisiona de perto e obtém a aprovação do usuário quando as regras exigirem.
+4. O resultado entregue precisar de correção que seja mais segura ou mais rápida de fazer diretamente do que de devolver.
+5. A delegação custar mais do que a execução, como em ajustes triviais que dependem de todo o contexto que ele já possui.
+
+### 11.6 Regras de conduta
+
+1. Não delegar só para delegar: se a delegação não melhora o resultado, a velocidade ou a segurança, executar diretamente.
+2. Não aceitar entrega que não foi verificada.
+3. Não declarar uma tarefa concluída sem ter confirmado que o resultado final cumpre o que foi pedido.
+4. Manter a documentação (`ARCHITECTURE.md` e `CLAUDE.md`) atualizada no mesmo commit, independentemente de quem executou a alteração.
+
+## 12. Ações no Supabase que o usuário precisa executar
+
+Sempre que uma ação no Supabase depender do usuário (rodar SQL, aplicar migração, ajustar configuração), o agente publica um artefato de página única em português, legível no celular, com:
+
+1. Link direto para o SQL Editor do projeto com consulta nova: `https://supabase.com/dashboard/project/nlhohtbgtiuqyhewbjnu/sql/new` (outras telas do painel também por link direto).
+2. Passos numerados e curtos, com o resultado esperado de cada um (por exemplo, `Success. No rows returned`).
+3. Um bloco de código por script, numerado, com botão "Copiar SQL N", para rodar um de cada vez e na ordem indicada. Avisar quando o Supabase pedir confirmação por causa de `drop`.
+4. Uma consulta de conferência somente de leitura, com botão de copiar e a tabela dos valores esperados.
+5. A instrução de parar no primeiro erro e enviar a mensagem exata.
+
+Migrações continuam salvas em `supabase/migrations/NNNN_nome.sql` e documentadas em `ARCHITECTURE.md`; o artefato é só o meio de entrega ao usuário. Depois que o usuário confirmar, o agente confere o resultado no banco antes de dar a ação por concluída.

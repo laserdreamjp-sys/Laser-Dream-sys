@@ -27,31 +27,108 @@ export const BACKUP_TABLES = [
 
 export type BackupTable = (typeof BACKUP_TABLES)[number];
 
+/**
+ * Tamanho de cada lote lido com .range(). Igual ao limite padrão de linhas
+ * por resposta do PostgREST (max-rows = 1000); um lote maior seria cortado
+ * pelo servidor sem erro.
+ */
+const PAGE_SIZE = 1000;
+
+/**
+ * Colunas da chave primária de cada tabela, usadas para ordenar a leitura.
+ * Sem ordem estável, a paginação por .range() pode pular ou repetir linhas.
+ */
+const ORDER_COLUMNS: Record<BackupTable, string[]> = {
+  org_settings: ["organization_id"],
+  payment_methods: ["id"],
+  lead_origins: ["id"],
+  cash_categories: ["id"],
+  sellers: ["id"],
+  seller_pairs: ["seller_id", "partner_id"],
+  procedures: ["id"],
+  procedure_areas: ["id"],
+  clients: ["id"],
+  sales: ["id"],
+  sale_areas: ["sale_id", "area_id"],
+  cash_transactions: ["id"],
+  cash_closures: ["id"],
+  change_requests: ["id"],
+};
+
 export type BackupPayload = {
-  version: 1;
+  /** 2: leitura paginada e campo `counts`. Arquivos version 1 não têm contagem. */
+  version: 2;
   organization_id: string;
   generated_at: string;
+  /** Quantidade de linhas gravadas por tabela (igual a tables[t].length). */
+  counts: Record<string, number>;
   tables: Record<string, unknown[]>;
 };
 
+async function countRows(supabase: SupabaseClient, table: BackupTable): Promise<number> {
+  const { count, error } = await supabase
+    .from(table)
+    .select("*", { count: "exact", head: true });
+  if (error) {
+    throw new Error(`Falha ao contar a tabela ${table}: ${error.message}`);
+  }
+  if (count === null) {
+    throw new Error(`O banco não devolveu a contagem da tabela ${table}.`);
+  }
+  return count;
+}
+
+async function readAllRows(supabase: SupabaseClient, table: BackupTable): Promise<unknown[]> {
+  const rows: unknown[] = [];
+  for (;;) {
+    const from = rows.length;
+    let query = supabase.from(table).select("*");
+    for (const column of ORDER_COLUMNS[table]) {
+      query = query.order(column, { ascending: true });
+    }
+    const { data, error } = await query.range(from, from + PAGE_SIZE - 1);
+    if (error) {
+      throw new Error(`Falha ao ler a tabela ${table} (linhas a partir de ${from}): ${error.message}`);
+    }
+    const page = data ?? [];
+    // Avança pelo que veio e para só no lote vazio: se o servidor tiver um
+    // limite menor que PAGE_SIZE, nenhuma linha é pulada.
+    if (page.length === 0) break;
+    rows.push(...page);
+  }
+  return rows;
+}
+
+/**
+ * Lê todas as linhas de cada tabela em lotes e confere com a contagem real.
+ * Lança erro (e nenhum arquivo deve ser gravado) se alguma tabela vier com
+ * menos linhas do que o banco informa: um backup truncado apagaria dados na
+ * restauração, porque restore_from_backup esvazia as tabelas antes de recarregar.
+ */
 export async function buildBackupPayload(
   supabase: SupabaseClient,
   organizationId: string
 ): Promise<BackupPayload> {
   const tables: Record<string, unknown[]> = {};
+  const counts: Record<string, number> = {};
 
   for (const table of BACKUP_TABLES) {
-    const { data, error } = await supabase.from(table).select("*");
-    if (error) {
-      throw new Error(`Falha ao ler a tabela ${table}: ${error.message}`);
+    const expected = await countRows(supabase, table);
+    const rows = await readAllRows(supabase, table);
+    if (rows.length < expected) {
+      throw new Error(
+        `Backup incompleto na tabela ${table}: lidas ${rows.length} de ${expected} linhas. Nenhum backup foi salvo.`
+      );
     }
-    tables[table] = data ?? [];
+    tables[table] = rows;
+    counts[table] = rows.length;
   }
 
   return {
-    version: 1,
+    version: 2,
     organization_id: organizationId,
     generated_at: new Date().toISOString(),
+    counts,
     tables,
   };
 }
