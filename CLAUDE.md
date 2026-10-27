@@ -21,7 +21,7 @@ Sistema de gestão de clínica (vendas, caixa, clientes, funil comercial, orçam
 
 Variáveis de ambiente (`.env.local` e painel da Vercel): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY` (somente servidor, usada pelos crons via `createServiceClient`), `CRON_SECRET`. Nunca expor a service role no cliente nem commitar valores.
 
-Banco: Supabase, projeto `nlhohtbgtiuqyhewbjnu` (`laser-dream-os`, `sa-east-1`). Mudanças de schema são migrações numeradas (última: 0044); a partir da 0042 o SQL fica em `supabase/migrations/NNNN_nome.sql` e é aplicado com o mesmo nome no Supabase. Toda tabela nova precisa de `organization_id`, RLS habilitada e policies que usem `current_organization_id()`, `is_admin()`, `is_manager()` e `current_unit_ids()`.
+Banco: Supabase, projeto `nlhohtbgtiuqyhewbjnu` (`laser-dream-os`, `sa-east-1`). Mudanças de schema são migrações numeradas (última: 0045); a partir da 0042 o SQL fica em `supabase/migrations/NNNN_nome.sql` e é aplicado com o mesmo nome no Supabase. Toda tabela nova precisa de `organization_id`, RLS habilitada e policies que usem `current_organization_id()`, `is_admin()`, `is_manager()` e `current_unit_ids()`.
 
 ## 2. Stack
 
@@ -50,7 +50,7 @@ Next.js 14.2.35 (App Router), React 18.3, TypeScript 5.5 em modo estrito, Tailwi
 
 `Administrador` (tudo), `Gerente` (visão da organização, caixa das suas unidades, catálogos), qualquer outro papel (vendas das suas unidades; edição e exclusão via `change_requests`).
 
-## 5. Banco de dados: referência rápida (41 tabelas, schema `public`)
+## 5. Banco de dados: referência rápida (42 tabelas, schema `public`)
 
 Formato: coluna→tabela indica chave estrangeira. `organization_id` aparece em quase todas e aponta para `organizations`. Dicionário completo (tipos, obrigatoriedade, defaults, RLS, índices) em `ARCHITECTURE.md` 1.2.
 
@@ -71,6 +71,7 @@ Formato: coluna→tabela indica chave estrangeira. `organization_id` aparece em 
 | `funnels` | `id` | `id`, `organization_id`, `name`, `position`, `active`, `created_at` |
 | `invites` | `id` | `id`, `organization_id`, `email`, `role_id`→roles, `unit_id`→units, `token`, `status`, `expires_at`, `created_by`→profiles, `created_at` |
 | `lead_origins` | `id` | `id`, `organization_id`, `name`, `code`, `active`, `created_at` |
+| `movimentacoes` | `id` | `id`, `organization_id`, `ocorrido_em`, `usuario_id`→profiles, `usuario_nome`, `acao`, `entidade`, `entidade_id`, `descricao`, `detalhes` |
 | `loss_reasons` | `id` | `id`, `organization_id`, `name`, `active` |
 | `opportunities` | `id` | `id`, `organization_id`, `unit_id`→units, `client_id`→clients, `stage_id`→pipeline_stages, `seller_id`→sellers, `lead_origin_id`→lead_origins, `estimated_value`, `notes`, `loss_reason_id`→loss_reasons, `sale_id`→sales, `created_by`→profiles, `created_at`, `updated_at`, `referred_by_name`, `interesse_procedure_id`→procedures, `data_avaliacao`, `is_test` |
 | `opportunity_areas` | `opportunity_id,area_id` | `opportunity_id`→opportunities, `area_id`→procedure_areas |
@@ -104,9 +105,9 @@ View: `client_intelligence` (`security_invoker`, uma linha por cliente e unidade
 
 RPCs chamadas pela aplicação: `get_invite_by_token`, `buscar_clientes_parecidos`, `scan_duplicates`, `merge_clients`, `permanent_delete_sale`, `limpar_dados_de_teste`, `restore_from_backup`.
 
-Funções de apoio a RLS: `current_organization_id`, `current_unit_ids`, `is_admin`, `is_manager`. Outras: `is_valid_cpf`, `classify_cpf_import`, `apply_cpf_import`, `avancar_followup`, `fn_block_closed_day`, `fn_handle_new_user`, `fn_sale_cash_sync`, `fn_sales_audit`, `fn_sales_classify`.
+Funções de apoio a RLS: `current_organization_id`, `current_unit_ids`, `is_admin`, `is_manager`. Outras: `is_valid_cpf`, `classify_cpf_import`, `apply_cpf_import`, `avancar_followup`, `fn_block_closed_day`, `fn_handle_new_user`, `fn_sale_cash_sync`, `fn_sales_audit`, `fn_sales_classify`, `fn_registrar_movimentacao`.
 
-Triggers: `trg_sales_classify` (BEFORE INSERT em `sales`), `trg_sales_audit` (AFTER UPDATE em `sales`), `trg_sale_cash_sync` (AFTER INSERT e UPDATE em `sales`, única origem da entrada de caixa de venda em dinheiro; índice único parcial `uq_cash_transactions_sale_id` garante uma entrada por venda), `trg_block_closed_day` (BEFORE INSERT, UPDATE e DELETE em `cash_transactions`), `trg_avancar_followup` (AFTER UPDATE em `opportunity_tasks`), `trg_handle_new_user` (AFTER INSERT em `auth.users`).
+Triggers: `trg_sales_classify` (BEFORE INSERT em `sales`), `trg_sales_audit` (AFTER UPDATE em `sales`), `trg_sale_cash_sync` (AFTER INSERT e UPDATE em `sales`, única origem da entrada de caixa de venda em dinheiro; índice único parcial `uq_cash_transactions_sale_id` garante uma entrada por venda), `trg_block_closed_day` (BEFORE INSERT, UPDATE e DELETE em `cash_transactions`), `trg_movimentacao` (AFTER INSERT, UPDATE e DELETE em 18 tabelas, grava `movimentacoes`; tabela nova com dado de negócio ganha esse gatilho), `trg_avancar_followup` (AFTER UPDATE em `opportunity_tasks`), `trg_handle_new_user` (AFTER INSERT em `auth.users`).
 
 ## 7. Rotas de API e crons
 
@@ -125,7 +126,7 @@ Triggers: `trg_sales_classify` (BEFORE INSERT em `sales`), `trg_sales_audit` (AF
 
 ## 9. Pontos de atenção atuais
 
-Resumo dos riscos de `ARCHITECTURE.md` 1.6: (1) não existe backup salvo em lugar algum; (2) resolvido: `buildBackupPayload` pagina, grava `counts` (formato `version: 2`) e falha se faltar linha, mas backups `version: 1` podem estar truncados; (3) resolvido na 0042: um só trigger lança a entrada de caixa da venda; (4) organização fixa no código; (5) resolvido na 0044: `anon` sem acesso a tabelas, só `get_invite_by_token` aberta; (9) resolvido: datas no fuso de Brasília; (14) resolvido: listas grandes paginadas com `buscarTodas`; (15) histórico geral de alterações (`movimentacoes`): 0045 testada e tela `/movimentacoes` pronta, aguardando o dono aplicar a 0045. A restauração recusa backup `version: 1` e backup cujo `counts` não bata com `tables`.
+Resumo dos riscos de `ARCHITECTURE.md` 1.6: (1) não existe backup salvo em lugar algum; (2) resolvido: `buildBackupPayload` pagina, grava `counts` (formato `version: 2`) e falha se faltar linha, mas backups `version: 1` podem estar truncados; (3) resolvido na 0042: um só trigger lança a entrada de caixa da venda; (4) organização fixa no código; (5) resolvido na 0044: `anon` sem acesso a tabelas, só `get_invite_by_token` aberta; (9) resolvido: datas no fuso de Brasília; (14) resolvido: listas grandes paginadas com `buscarTodas`; (15) resolvido na 0045: histórico de alterações ativo, tela `/movimentacoes`. A restauração recusa backup `version: 1` e backup cujo `counts` não bata com `tables`.
 
 ## 10. Como manter este arquivo
 

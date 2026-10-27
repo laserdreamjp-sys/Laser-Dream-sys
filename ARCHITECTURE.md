@@ -37,7 +37,7 @@ O sistema é multi-organização por modelagem (toda tabela de negócio tem `org
 | Ícones | lucide-react | n/a | Menu e botões |
 | Gráficos | recharts | n/a | Gráficos do dashboard (`dashboard-charts.tsx`) |
 | Arrastar e soltar | @dnd-kit | n/a | Quadro kanban do funil (`funil-board.tsx`) |
-| Banco de dados | Supabase (PostgreSQL) | n/a | 41 tabelas, 1 view, 22 funções do negócio, RLS ativo em todas as tabelas |
+| Banco de dados | Supabase (PostgreSQL) | n/a | 42 tabelas, 1 view, 21 funções do negócio, RLS ativo em todas as tabelas |
 | Autenticação | Supabase Auth (e-mail e senha) | n/a | Sessão por cookies via `@supabase/ssr` |
 | Armazenamento de arquivos | Supabase Storage | n/a | Bucket privado `backups` |
 | Clientes Supabase | `@supabase/ssr` 0.5.1 e `@supabase/supabase-js` 2.45.4 | n/a | Três clientes: navegador, servidor e service role |
@@ -303,7 +303,7 @@ Convenções:
 - **Obrigatório:** "Sim" significa `NOT NULL`; "Não" significa que a coluna aceita nulo.
 - **Valor Padrão:** expressão `DEFAULT` da coluna; "-" indica que não há padrão.
 - **FK:** vem com a regra `ON DELETE`. "NO ACTION" significa que o banco impede apagar o registro referenciado enquanto houver dependentes.
-- **RLS:** todas as 41 tabelas têm Row Level Security ligado. As políticas usam as funções `current_organization_id()`, `is_admin()`, `is_manager()` e `current_unit_ids()` (ver 1.2.4).
+- **RLS:** todas as 42 tabelas têm Row Level Security ligado. As políticas usam as funções `current_organization_id()`, `is_admin()`, `is_manager()` e `current_unit_ids()` (ver 1.2.4).
 - Todas as tabelas estão no schema `public`. Além delas existem a view `client_intelligence`, o bucket de Storage `backups`, as chaves de `localStorage` e os cookies de sessão do Supabase (1.2.3).
 
 ### 1.2.1 Tabelas por domínio
@@ -1089,6 +1089,28 @@ Registro dos arquivos de backup guardados no bucket backups.
 - **Chave primária:** `id`.
 - **RLS (ativo):** SELECT, INSERT e DELETE: administrador da mesma organização.
 - **Índices e restrições:** CHECK backups_kind_check.
+#### `movimentacoes`
+
+Histórico de alterações: quem criou, editou, excluiu ou restaurou o quê e quando (migração 0045, aplicada em 27/10/2026; modelo da Harmonize). Escrita só pelo gatilho `fn_registrar_movimentacao` e por `restore_from_backup`; sem política de escrita, para o histórico não poder ser reescrito pela API.
+
+| Nome do Campo | Tipo de Dado | Obrigatório | Valor Padrão | Descrição/Finalidade |
+|---|---|---|---|---|
+| `id` | uuid | Sim | `gen_random_uuid()` | Identificador único (chave primária). [PK] |
+| `organization_id` | uuid | Não | - | Organização do registro alterado (ou `current_organization_id()`). [FK para `organizations.id` (ON DELETE CASCADE)] |
+| `ocorrido_em` | timestamptz | Sim | `now()` | Momento da alteração. |
+| `usuario_id` | uuid | Não | - | Quem fez (`auth.uid()`); nulo quando foi o sistema (cron, service role). [FK para `profiles.id` (ON DELETE SET NULL)] |
+| `usuario_nome` | text | Sim | - | Nome de quem fez no momento (`profiles.full_name`), ou "Sistema (automático)". |
+| `acao` | text | Sim | - | `criado`, `editado`, `excluido` ou `restaurado` (CHECK). |
+| `entidade` | text | Sim | - | Tabela alterada (`backup` na restauração). |
+| `entidade_id` | text | Não | - | Id do registro (`id`, ou `organization_id` em `org_settings`, ou `user_id` em `user_units`). |
+| `descricao` | text | Sim | - | Descrição legível, por exemplo "Venda de R$ 350,00 em 12/10/2026 para Ana". |
+| `detalhes` | jsonb | Sim | `'{}'` | Edição: `{ campo: { de, para } }` só dos campos que mudaram; criação e exclusão: a linha inteira; restauração: `{ linhas_por_tabela }`. Campos ocultos aparecem como `***`. |
+
+- **Chave primária:** `id`.
+- **RLS (ativo):** SELECT: administrador da mesma organização (`movimentacoes_select`). Sem INSERT, UPDATE ou DELETE por política; `authenticated` só tem SELECT; `anon` nada.
+- **Índices:** `movimentacoes_org_data_idx` (`organization_id`, `ocorrido_em desc`) e `movimentacoes_entidade_idx` (`entidade`, `entidade_id`).
+- **Fora do backup** de propósito: a restauração apaga e recarrega as tabelas do backup e apagaria o histórico.
+
 ### 1.2.2 View `client_intelligence`
 
 View do Postgres com `security_invoker = true` (respeita a RLS de quem consulta). Agrega vendas **ativas** por cliente **e por unidade** (`GROUP BY` inclui `s.unit_id`), cruzando com `org_settings` por `CROSS JOIN` de uma subconsulta `LIMIT 1` (premissa de organização única). Alimenta Radar, classificação (tier) do cliente e contadores do dashboard.
@@ -1208,6 +1230,7 @@ Formato do arquivo de backup (`BackupPayload`, definido em `src/lib/backup.ts`):
 | `sales` | `trg_sales_audit` | AFTER UPDATE | `fn_sales_audit()` | Grava em `sales_history` mudanças de `amount`, `status` e `payment_method` (nome da forma), com `changed_by = updated_by` |
 | `sales` | `trg_sale_cash_sync` | AFTER INSERT e UPDATE | `fn_sale_cash_sync()` | Venda em dinheiro (`payment_methods.code = 'dinheiro'`) e ativa: insere entrada em `cash_transactions` (descrição `Venda <id da venda>`). Em UPDATE: cancelamento apaga os lançamentos da venda; venda em dinheiro ativa atualiza valor, data e unidade (ou insere se não existir); troca para forma que não é dinheiro apaga o lançamento |
 | `cash_transactions` | `trg_block_closed_day` | BEFORE INSERT, UPDATE e DELETE | `fn_block_closed_day()` | Se existe `cash_closures` da unidade na `transaction_date` com `reopened = false`, lança exceção "Dia de caixa ja fechado para esta unidade" |
+| 18 tabelas (`clients`, `sales`, `cash_transactions`, `cash_closures`, `org_settings`, `profiles`, `user_units`, `invites`, `change_requests`, `backups`, `payment_methods`, `procedures`, `procedure_areas`, `sellers`, `lead_origins`, `cash_categories`, `units`, `roles`) | `trg_movimentacao` | AFTER INSERT, UPDATE e DELETE | `fn_registrar_movimentacao()` | Grava em `movimentacoes` quem fez, a ação, a descrição legível e os campos alterados (de, para), ignorando `updated_at` e `updated_by`. Em `sales` ignora `amount`, `status` e `payment_method_id` na edição (já ficam em `sales_history`); em `org_settings` mostra `senha_exclusao_permanente` como `***`. Não registra nada quando `laser.sem_movimentacao = on` (usado por `restore_from_backup`, que grava uma linha de resumo) |
 | `opportunity_tasks` | `trg_avancar_followup` | AFTER UPDATE | `avancar_followup()` | Quando uma tarefa `followup_confirmar_N` passa a `done = true`: aplica a etiqueta `Follow-up N` (remove a `Follow-up N-1`); se N < 5 cria a tarefa `followup_confirmar_N+1` com prazo hoje + 2 dias; se N = 5 move a oportunidade para a etapa `Nutrição` do mesmo funil e registra `opportunity_events` |
 
 ### 1.2.5 Relacionamentos principais
@@ -2084,6 +2107,7 @@ Cada célula lista os IDs das funcionalidades (tabela 1.4.1) que executam a oper
 | `roles` | nenhuma | F02, F03, F04, F33 | nenhuma | nenhuma |
 | `profiles` | F04 | F02, F03, F15, F20, F33 | nenhuma | nenhuma |
 | `user_units` | F04 | nenhuma | nenhuma | nenhuma |
+| `movimentacoes` | gatilho `trg_movimentacao` | Histórico (`/movimentacoes`) | nenhuma | nenhuma |
 | `invites` | F03 | F03, F04, F33 | F04 | nenhuma |
 | `role_permissions` | nenhuma | nenhuma | nenhuma | nenhuma |
 | `clients` | F17, F19, F21, F39, F45 | F06, F07, F09, F16, F18, F19, F21, F24, F25, F27, F29, F32, F38, F40, F45, F46 | F07, F31, F32, F45 | F31, F32, F39 |
@@ -2169,6 +2193,7 @@ Resposta JSON: `ok`, `tarefas_criadas`, `detalhe`, `leads_etiquetados_esfriando`
 | AFTER UPDATE em `sales` | `trg_sales_audit` (`fn_sales_audit`) | Grava a mudança em `sales_history` |
 | AFTER INSERT e UPDATE em `sales` | `trg_sale_cash_sync` (`fn_sale_cash_sync`) | Na inserção de venda `ativa` paga com forma de `code = 'dinheiro'`, insere entrada com descrição `Venda <id>`; na atualização, apaga a entrada se a venda passa de `ativa` para `cancelada`, ou atualiza valor, data e unidade (criando a entrada se não existir) |
 | BEFORE INSERT, UPDATE e DELETE em `cash_transactions` | `trg_block_closed_day` (`fn_block_closed_day`) | Impede alteração em dia com `cash_closures` fechado |
+| AFTER INSERT, UPDATE e DELETE em 18 tabelas | `trg_movimentacao` (`fn_registrar_movimentacao`) | Registra a alteração em `movimentacoes` (ver 1.2.4) |
 | AFTER UPDATE em `opportunity_tasks` | `trg_avancar_followup` (`avancar_followup`) | Ao concluir tarefa com `auto_rule` `followup_confirmar_N`, aplica a etiqueta `Follow-up N` (removendo a anterior), cria a tarefa N+1 enquanto N < 5 e, ao concluir a quinta, move o lead para a etapa de Nutrição |
 
 Eventos no navegador: `window` dispara `modo-teste-mudou` quando o modo teste é alternado (chave `laser_dream_modo_teste` no `localStorage`); `theme` guarda o tema. Não existe websocket, Supabase Realtime nem webhook; as telas atualizam com `router.refresh()` após cada gravação.
@@ -2191,8 +2216,8 @@ Levantamento feito comparando o código com o banco real (projeto `nlhohtbgtiuqy
 | 10 | Média | Aprovação de solicitações aplicada no cliente | `request-actions.tsx` executa as alterações no navegador do administrador | Mover para uma RPC transacional para evitar aprovação parcial |
 | 11 | Baixa | Tipos do banco desatualizados | `src/types/database.ts` não reflete as 41 tabelas e a view | Regenerar com `supabase gen types typescript` e fixar no repositório |
 | 12 | Baixa | Estruturas sem uso | `organizations`, `role_permissions`, `packages` sem código; `orcamentos` com status `convertido` e `perdido` que nenhum código grava | Decidir entre implementar ou remover |
-| 13 | Baixa | Sem testes automatizados e sem integração Git no Supabase | Nenhum script de teste; migrações 0001 a 0041 não versionadas no repositório; a partir da 0042 os arquivos ficam em `supabase/migrations/` (0042: entrada de caixa única por venda; 0043: remove o trigger reverter; 0044: fecha o acesso de `anon`) | Testes automáticos existem desde 26/10/2026 (`npm test`, 28 testes de datas, paginação e backup). Falta exportar as migrações 0001 a 0041 e cobrir as regras de caixa e de classificação de venda |
+| 13 | Baixa | Sem testes automatizados e sem integração Git no Supabase | Nenhum script de teste; migrações 0001 a 0041 não versionadas no repositório; a partir da 0042 os arquivos ficam em `supabase/migrations/` (0042: entrada de caixa única por venda; 0043: remove o trigger reverter; 0044: fecha o acesso de `anon`; 0045: histórico de alterações) | Testes automáticos existem desde 26/10/2026 (`npm test`, 28 testes de datas, paginação e backup). Falta exportar as migrações 0001 a 0041 e cobrir as regras de caixa e de classificação de venda |
 | 14 | Crítica (resolvido no código) | Listas cortadas em 1.000 linhas sem aviso | O Supabase devolve no máximo 1.000 linhas por resposta. `client_intelligence` tem 4.672 linhas e `sales` 1.686: o Radar mostrava só os 1.000 clientes de maior valor, a contagem do Radar no Dashboard saía errada e as exportações CSV (`vendas`, `clientes-procedimentos`, `clientes-completo`, `radar`) vinham incompletas | **Corrigido:** essas leituras usam `buscarTodas` (`src/lib/buscar-todas.ts`). Regra: lista que pode passar de 1.000 linhas usa `buscarTodas`. Prática trazida da Harmonize |
-| 15 | Média (0045 testada, aguardando aplicação) | Sem histórico geral de alterações | Só a venda tinha histórico (`sales_history`, três campos); edição e exclusão de cliente, caixa, fechamento, usuários, convites, configurações e catálogos não deixavam rastro de quem fez | Migração `0045_movimentacoes.sql` (modelo da Harmonize): tabela `movimentacoes` (quem, ação criado/editado/excluido/restaurado, entidade, descrição legível, detalhes de/para), escrita só pelo gatilho `fn_registrar_movimentacao` em 18 tabelas, leitura só do Admin, sem política de escrita; não repete `sales_history`; senha de exclusão aparece como `***`; `restore_from_backup` desliga o registro durante a carga e grava uma linha de resumo. Fica fora do backup de propósito (a restauração apagaria o histórico). Teste no banco real numa transação revertida passou (27/10/2026: cliente, venda sem repetir `sales_history`, senha como `***`, caixa, nome de quem fez, escrita e exclusão negadas, Gerente sem leitura). Tela `/movimentacoes` pronta (1.3.14). Falta o dono aplicar a 0045 |
+| 15 | Média (resolvido na 0045) | Sem histórico geral de alterações | Só a venda tinha histórico (`sales_history`, três campos); edição e exclusão de cliente, caixa, fechamento, usuários, convites, configurações e catálogos não deixavam rastro de quem fez | Migração `0045_movimentacoes.sql` (modelo da Harmonize): tabela `movimentacoes` (quem, ação criado/editado/excluido/restaurado, entidade, descrição legível, detalhes de/para), escrita só pelo gatilho `fn_registrar_movimentacao` em 18 tabelas, leitura só do Admin, sem política de escrita; não repete `sales_history`; senha de exclusão aparece como `***`; `restore_from_backup` desliga o registro durante a carga e grava uma linha de resumo. Fica fora do backup de propósito (a restauração apagaria o histórico). Teste no banco real numa transação revertida passou (27/10/2026: cliente, venda sem repetir `sales_history`, senha como `***`, caixa, nome de quem fez, escrita e exclusão negadas, Gerente sem leitura). Tela `/movimentacoes` pronta (1.3.14). Aplicada pelo dono em 27/10/2026 e conferida no banco: tabela criada, 18 gatilhos, `anon` sem leitura, restauração ajustada |
 
 **Recomendação.** Executar os itens 1 e 2 antes de qualquer outra mudança: hoje uma falha no banco significa perda total de dados, e o backup atual, mesmo quando existir, pode não conter todos os registros. Em seguida, tratar o item 3 (risco financeiro de lançamento duplicado) e o item 5.
