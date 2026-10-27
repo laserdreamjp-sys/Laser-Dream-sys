@@ -244,7 +244,7 @@ Tipos gerados do Supabase em estado **defasado**. Cobre apenas `cash_categories`
 | Arquivo | Método e rota | Acesso | Responsabilidade |
 |---|---|---|---|
 | `backup/generate/route.ts` | `POST /api/backup/generate` | Administrador | Gera o JSON com `buildBackupPayload`, grava em `backups/<org>/backup-<carimbo>.json` e registra em `backups` com `kind = manual` |
-| `backup/list/route.ts` | `GET /api/backup/list` | Administrador | Lista `backups` e devolve URL assinada de 10 minutos por arquivo |
+| `backup/list/route.ts` | `GET /api/backup/list` | Administrador | Lista `backups` e devolve URL assinada de 10 minutos por arquivo, gerada com `download: <nome do arquivo>` para o Supabase mandar como anexo (sem isso o navegador abre o JSON na tela em vez de baixar) |
 | `backup/restore/route.ts` | `POST /api/backup/restore` | Administrador | Exige `confirm = "RESTAURAR"`, baixa o backup, grava um backup de segurança `pre-restauracao-<carimbo>.json` (`kind = automatico`) e chama a RPC `restore_from_backup(payload)`. Cancela se o backup de segurança falhar |
 | `cron/backup/route.ts` | `GET /api/cron/backup` | `Bearer CRON_SECRET` | Backup diário com service role, `kind = automatico`, remove backups com mais de 30 dias (`RETENTION_DAYS`) do Storage e da tabela |
 | `cron/funil-automacoes/route.ts` | `GET /api/cron/funil-automacoes` | `Bearer CRON_SECRET` | Automações do funil (detalhe em 1.5) |
