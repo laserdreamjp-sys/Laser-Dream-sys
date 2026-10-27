@@ -22,17 +22,8 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 400 });
   }
 
-  const withUrls = await Promise.all(
-    (data ?? []).map(async (b) => {
-      // `download` faz o Supabase mandar o arquivo como anexo (Content-Disposition),
-      // com este nome. Sem isso o navegador abre o JSON na tela em vez de baixar.
-      const nomeDoArquivo = b.storage_path.split("/").pop() ?? "backup.json";
-      const { data: signed } = await supabase.storage
-        .from("backups")
-        .createSignedUrl(b.storage_path, 60 * 10, { download: nomeDoArquivo });
-      return { ...b, download_url: signed?.signedUrl ?? null };
-    })
-  );
+  // O arquivo é entregue pela rota /api/backup/download/<id> (mesma origem, como anexo).
+  const withUrls = (data ?? []).map((b) => ({ ...b, download_url: `/api/backup/download/${b.id}` }));
 
   return NextResponse.json({ backups: withUrls });
 }
