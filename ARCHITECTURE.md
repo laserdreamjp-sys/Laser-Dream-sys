@@ -144,6 +144,7 @@ laser-dream-os/
     │   ├── cpf.ts
     │   ├── current-profile.ts
     │   ├── datas.ts
+    │   ├── movimentacoes.ts
     │   ├── senha.ts
     │   ├── unwrap.ts
     │   └── supabase/{client.ts, server.ts, service.ts}
@@ -191,6 +192,7 @@ laser-dream-os/
 | `current-profile.ts` | `getCurrentProfile()` devolve `userId`, `organizationId`, `fullName`, `roleName`, `isAdmin`, `isManager` |
 | `unwrap.ts` | `unwrap<T>()` lança erro quando a consulta Supabase retorna `error` |
 | `buscar-todas.ts` | `buscarTodas(consulta, contexto)`: lê todas as linhas em lotes de 1.000 (`TAMANHO_DO_LOTE`), avançando pelo que veio e parando no lote vazio; lança erro em vez de devolver lista parcial. A consulta recebe `(de, ate)`, precisa de ordem estável terminando em coluna única e de `.range(de, ate)`. Usado no Radar, no Dashboard (contagem do Radar e totais de caixa) e nas 4 exportações CSV |
+| `movimentacoes.ts` | Regras puras da tela Histórico: grupos de tipo (Clientes, Vendas, Caixa, Usuários e acesso, Configurações e catálogos, Solicitações, Backups) para entidades, tradução de campos, formatação de valores (vazio, Sim/Não, datas DD/MM/AAAA), leitura e validação dos filtros, período padrão de 30 dias e `tabelaInexistente` (aviso quando a 0045 não foi aplicada). Testado em `movimentacoes.test.ts` |
 | `senha.ts` | `problemaSenha(senha)` devolve a mensagem do primeiro problema ou `null` (mínimo 8 caracteres, minúscula, maiúscula e número) e `DICA_SENHA`; usado no cadastro por convite |
 | `datas.ts` | Datas no fuso `America/Sao_Paulo`: `hojeLocal()`, `dataLocal(instante)`, `somarDias(data, n)`, `mesAtualLocal()`, `primeiroDiaDoMesLocal()`. Substitui `toISOString().slice(0,10)`, que dá a data em UTC |
 | `cpf.ts` | `normalizeCpf` (só dígitos), `formatCpf` (000.000.000-00), `maskCpf` (oculta dígitos), `isValidCpf` (dígitos verificadores) e a lista `UFS` |
@@ -1994,6 +1996,14 @@ Usuários não Admin veem apenas as próprias solicitações (RLS `change_reques
 
 Não há tela para `units`, `procedure_areas`, `seller_pairs`, `funnels`, `pipeline_stages`, `loss_reasons`, `roles`, `role_permissions`, `packages` nem `tags` além do que o lead permite; essas tabelas são mantidas direto no banco.
 
+### 1.3.14 Histórico de alterações (`/movimentacoes`)
+
+**O que faz.** Lista somente leitura de quem criou, editou, excluiu ou restaurou registros, com data e hora de Brasília, ação, tipo e descrição legível; "Ver detalhes" mostra Campo | Antes | Depois na edição, os campos preenchidos na criação e na exclusão e as linhas por tabela na restauração. Cliente não excluído tem link para a ficha. Modelo da tela Movimentações da Harmonize.
+
+**Onde.** `movimentacoes/page.tsx` (Server Component), `src/lib/movimentacoes.ts`, item "Histórico" em `sidebar.tsx` (só aparece para `Administrador`, primeiro item do menu escondido por papel).
+
+**Regras.** Só Administrador (checagem na página e RLS `movimentacoes_select`). Filtros por URL: `de` e `ate` (padrão últimos 30 dias, limites em `-03:00`), `tipo`, `acao`, `usuario`, `busca` (`ilike` em `descricao`) e `pagina` (100 por página, ordem `ocorrido_em desc, id desc`). Sem a tabela (0045 não aplicada) mostra "O histórico ainda não foi ativado no banco (migração 0045)". A tabela é escrita só pelo gatilho `fn_registrar_movimentacao` e por `restore_from_backup` (ver risco 15).
+
 ### 1.3.13 Recursos transversais
 
 | Recurso | Onde | Regra |
@@ -2183,6 +2193,6 @@ Levantamento feito comparando o código com o banco real (projeto `nlhohtbgtiuqy
 | 12 | Baixa | Estruturas sem uso | `organizations`, `role_permissions`, `packages` sem código; `orcamentos` com status `convertido` e `perdido` que nenhum código grava | Decidir entre implementar ou remover |
 | 13 | Baixa | Sem testes automatizados e sem integração Git no Supabase | Nenhum script de teste; migrações 0001 a 0041 não versionadas no repositório; a partir da 0042 os arquivos ficam em `supabase/migrations/` (0042: entrada de caixa única por venda; 0043: remove o trigger reverter; 0044: fecha o acesso de `anon`) | Testes automáticos existem desde 26/10/2026 (`npm test`, 28 testes de datas, paginação e backup). Falta exportar as migrações 0001 a 0041 e cobrir as regras de caixa e de classificação de venda |
 | 14 | Crítica (resolvido no código) | Listas cortadas em 1.000 linhas sem aviso | O Supabase devolve no máximo 1.000 linhas por resposta. `client_intelligence` tem 4.672 linhas e `sales` 1.686: o Radar mostrava só os 1.000 clientes de maior valor, a contagem do Radar no Dashboard saía errada e as exportações CSV (`vendas`, `clientes-procedimentos`, `clientes-completo`, `radar`) vinham incompletas | **Corrigido:** essas leituras usam `buscarTodas` (`src/lib/buscar-todas.ts`). Regra: lista que pode passar de 1.000 linhas usa `buscarTodas`. Prática trazida da Harmonize |
-| 15 | Média (correção pronta na 0045, aguardando teste e aplicação) | Sem histórico geral de alterações | Só a venda tinha histórico (`sales_history`, três campos); edição e exclusão de cliente, caixa, fechamento, usuários, convites, configurações e catálogos não deixavam rastro de quem fez | Migração `0045_movimentacoes.sql` (modelo da Harmonize): tabela `movimentacoes` (quem, ação criado/editado/excluido/restaurado, entidade, descrição legível, detalhes de/para), escrita só pelo gatilho `fn_registrar_movimentacao` em 18 tabelas, leitura só do Admin, sem política de escrita; não repete `sales_history`; senha de exclusão aparece como `***`; `restore_from_backup` desliga o registro durante a carga e grava uma linha de resumo. Fica fora do backup de propósito (a restauração apagaria o histórico). Falta: testar no banco numa transação revertida, aplicar e criar a tela |
+| 15 | Média (0045 testada, aguardando aplicação) | Sem histórico geral de alterações | Só a venda tinha histórico (`sales_history`, três campos); edição e exclusão de cliente, caixa, fechamento, usuários, convites, configurações e catálogos não deixavam rastro de quem fez | Migração `0045_movimentacoes.sql` (modelo da Harmonize): tabela `movimentacoes` (quem, ação criado/editado/excluido/restaurado, entidade, descrição legível, detalhes de/para), escrita só pelo gatilho `fn_registrar_movimentacao` em 18 tabelas, leitura só do Admin, sem política de escrita; não repete `sales_history`; senha de exclusão aparece como `***`; `restore_from_backup` desliga o registro durante a carga e grava uma linha de resumo. Fica fora do backup de propósito (a restauração apagaria o histórico). Teste no banco real numa transação revertida passou (27/10/2026: cliente, venda sem repetir `sales_history`, senha como `***`, caixa, nome de quem fez, escrita e exclusão negadas, Gerente sem leitura). Tela `/movimentacoes` pronta (1.3.14). Falta o dono aplicar a 0045 |
 
 **Recomendação.** Executar os itens 1 e 2 antes de qualquer outra mudança: hoje uma falha no banco significa perda total de dados, e o backup atual, mesmo quando existir, pode não conter todos os registros. Em seguida, tratar o item 3 (risco financeiro de lançamento duplicado) e o item 5.

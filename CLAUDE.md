@@ -121,11 +121,11 @@ Triggers: `trg_sales_classify` (BEFORE INSERT em `sales`), `trg_sales_audit` (AF
 
 ## 8. Telas
 
-`/login`, `/convite/[token]`, `/dashboard`, `/vendas`, `/vendas/novo`, `/caixa`, `/clientes`, `/clientes/[id]`, `/funil`, `/orcamentos`, `/orcamentos/novo`, `/orcamentos/[id]`, `/radar`, `/relatorios`, `/relatorios/funil`, `/solicitacoes`, `/usuarios`, `/configuracoes`. Regras de cada uma em `ARCHITECTURE.md` 1.3.
+`/login`, `/convite/[token]`, `/dashboard`, `/vendas`, `/vendas/novo`, `/caixa`, `/clientes`, `/clientes/[id]`, `/funil`, `/orcamentos`, `/orcamentos/novo`, `/orcamentos/[id]`, `/radar`, `/relatorios`, `/relatorios/funil`, `/solicitacoes`, `/usuarios`, `/configuracoes`, `/movimentacoes` (Histórico, só Administrador). Regras de cada uma em `ARCHITECTURE.md` 1.3.
 
 ## 9. Pontos de atenção atuais
 
-Resumo dos riscos de `ARCHITECTURE.md` 1.6: (1) não existe backup salvo em lugar algum; (2) resolvido: `buildBackupPayload` pagina, grava `counts` (formato `version: 2`) e falha se faltar linha, mas backups `version: 1` podem estar truncados; (3) resolvido na 0042: um só trigger lança a entrada de caixa da venda; (4) organização fixa no código; (5) resolvido na 0044: `anon` sem acesso a tabelas, só `get_invite_by_token` aberta; (9) resolvido: datas no fuso de Brasília; (14) resolvido: listas grandes paginadas com `buscarTodas`; (15) histórico geral de alterações (`movimentacoes`) pronto na 0045, aguardando teste e aplicação. A restauração recusa backup `version: 1` e backup cujo `counts` não bata com `tables`.
+Resumo dos riscos de `ARCHITECTURE.md` 1.6: (1) não existe backup salvo em lugar algum; (2) resolvido: `buildBackupPayload` pagina, grava `counts` (formato `version: 2`) e falha se faltar linha, mas backups `version: 1` podem estar truncados; (3) resolvido na 0042: um só trigger lança a entrada de caixa da venda; (4) organização fixa no código; (5) resolvido na 0044: `anon` sem acesso a tabelas, só `get_invite_by_token` aberta; (9) resolvido: datas no fuso de Brasília; (14) resolvido: listas grandes paginadas com `buscarTodas`; (15) histórico geral de alterações (`movimentacoes`): 0045 testada e tela `/movimentacoes` pronta, aguardando o dono aplicar a 0045. A restauração recusa backup `version: 1` e backup cujo `counts` não bata com `tables`.
 
 ## 10. Como manter este arquivo
 
