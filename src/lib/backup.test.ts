@@ -1,6 +1,13 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
-import { BACKUP_TABLES, buildBackupPayload } from "@/lib/backup";
+import {
+  BACKUP_TABLES,
+  buildBackupPayload,
+  LEGACY_V2_TABLES,
+  RESTORE_DELETE_ORDER,
+  RESTORE_INSERT_ORDER,
+  validarPayloadParaRestaurar,
+} from "@/lib/backup";
 
 type Linha = Record<string, unknown>;
 type Erro = { message: string };
@@ -70,17 +77,20 @@ function linhas(n: number, prefixo = "r"): Linha[] {
 const ORG = "00000000-0000-0000-0000-000000000001";
 
 describe("buildBackupPayload", () => {
-  it("gera version 2 com counts iguais ao tamanho de cada lista e lê mais de 1.000 linhas por completo", async () => {
+  it("gera version 3 com counts iguais ao tamanho de cada lista e lê mais de 1.000 linhas por completo", async () => {
     const dados: Record<string, Linha[]> = {
       clients: linhas(2345, "c"),
       sales: linhas(1000, "s"),
+      opportunities: linhas(1001, "o"),
+      sales_history: linhas(2500, "h"),
       sellers: linhas(7, "v"),
     };
     const { cliente, chamadas } = clienteFalso({ dados });
 
     const payload = await buildBackupPayload(cliente, ORG);
 
-    expect(payload.version).toBe(2);
+    expect(payload.version).toBe(3);
+    expect(BACKUP_TABLES).toHaveLength(32);
     expect(payload.organization_id).toBe(ORG);
     expect(Number.isNaN(Date.parse(payload.generated_at))).toBe(false);
     expect(Object.keys(payload.tables).sort()).toEqual([...BACKUP_TABLES].sort());
@@ -101,6 +111,19 @@ describe("buildBackupPayload", () => {
 
     const lotesPares = chamadas.filter((c) => c.tabela === "sale_areas");
     expect(lotesPares[0].order).toEqual(["sale_id", "area_id"]);
+    const lotesTags = chamadas.filter((c) => c.tabela === "opportunity_tags");
+    expect(lotesTags[0].order).toEqual(["opportunity_id", "tag_id"]);
+    const lotesConfig = chamadas.filter((c) => c.tabela === "org_settings");
+    expect(lotesConfig[0].order).toEqual(["organization_id"]);
+  });
+
+  it("lê tabelas novas com mais de 1.000 linhas", async () => {
+    const dados = { budget_items: linhas(1500, "b"), opportunity_events: linhas(3000, "e") };
+    const { cliente } = clienteFalso({ dados });
+    const payload = await buildBackupPayload(cliente, ORG);
+    expect(payload.counts.budget_items).toBe(1500);
+    expect(payload.counts.opportunity_events).toBe(3000);
+    expect(payload.tables.opportunity_events).toEqual(dados.opportunity_events);
   });
 
   it("não pula linhas se o servidor cortar em menos de 1.000 por resposta", async () => {
@@ -146,5 +169,84 @@ describe("buildBackupPayload", () => {
     await expect(buildBackupPayload(cliente, ORG)).rejects.toThrow(
       "Falha ao contar a tabela procedures: timeout"
     );
+  });
+});
+
+describe("ordem de restauração", () => {
+  it("exclusão é o inverso da inserção e cobre as 32 tabelas", () => {
+    expect(RESTORE_INSERT_ORDER).toEqual([...BACKUP_TABLES]);
+    expect(RESTORE_DELETE_ORDER).toEqual([...BACKUP_TABLES].reverse());
+    expect(new Set(BACKUP_TABLES).size).toBe(32);
+  });
+  it("as 14 tabelas antigas são subconjunto das 32", () => {
+    expect(LEGACY_V2_TABLES).toHaveLength(14);
+    for (const t of LEGACY_V2_TABLES) expect(BACKUP_TABLES).toContain(t);
+  });
+});
+
+function arquivo(tabelas: readonly string[], versao = 3) {
+  const tables: Record<string, unknown[]> = {};
+  const counts: Record<string, number> = {};
+  for (const t of tabelas) {
+    tables[t] = [{ id: `${t}-1` }, { id: `${t}-2` }];
+    counts[t] = 2;
+  }
+  return { version: versao, organization_id: ORG, generated_at: "2026-01-01T00:00:00Z", counts, tables };
+}
+
+describe("validarPayloadParaRestaurar", () => {
+  it("aceita v3 completo", () => {
+    expect(validarPayloadParaRestaurar(arquivo(BACKUP_TABLES))).toEqual({ ok: true, versao: 3 });
+  });
+  it("aceita v2 com as 14 tabelas", () => {
+    expect(validarPayloadParaRestaurar(arquivo(LEGACY_V2_TABLES, 2))).toEqual({ ok: true, versao: 2 });
+  });
+  it("recusa v1", () => {
+    const r = validarPayloadParaRestaurar({ version: 1, tables: {} });
+    expect(r.ok).toBe(false);
+  });
+  it("recusa v2 com tabela faltando", () => {
+    const a = arquivo(LEGACY_V2_TABLES, 2);
+    delete a.tables.sales;
+    const r = validarPayloadParaRestaurar(a);
+    expect(r).toMatchObject({ ok: false });
+    expect(!r.ok && r.erro).toContain("sales");
+    expect(!r.ok && r.erro).toContain("nenhum dado foi alterado");
+  });
+  it("recusa v3 sem uma tabela", () => {
+    const a = arquivo(BACKUP_TABLES);
+    delete a.tables.budgets;
+    const r = validarPayloadParaRestaurar(a);
+    expect(!r.ok && r.erro).toContain("budgets");
+  });
+  it("recusa v3 com apenas as 14 tabelas antigas", () => {
+    expect(validarPayloadParaRestaurar(arquivo(LEGACY_V2_TABLES, 3)).ok).toBe(false);
+  });
+  it("recusa counts divergente", () => {
+    const a = arquivo(BACKUP_TABLES);
+    a.counts.clients = 5;
+    const r = validarPayloadParaRestaurar(a);
+    expect(!r.ok && r.erro).toContain("clients");
+  });
+  it("recusa tabela sem contagem", () => {
+    const a = arquivo(BACKUP_TABLES);
+    delete a.counts.tags;
+    expect(validarPayloadParaRestaurar(a).ok).toBe(false);
+  });
+  it("recusa tabela que não é lista", () => {
+    const a = arquivo(BACKUP_TABLES) as { tables: Record<string, unknown> };
+    a.tables.funnels = { id: 1 };
+    const r = validarPayloadParaRestaurar(a);
+    expect(!r.ok && r.erro).toContain("funnels");
+  });
+  it("recusa sem tables ou sem counts", () => {
+    expect(validarPayloadParaRestaurar({ version: 3, counts: {} }).ok).toBe(false);
+    expect(validarPayloadParaRestaurar({ version: 3, tables: {} }).ok).toBe(false);
+  });
+  it("recusa nulo, lista e texto", () => {
+    expect(validarPayloadParaRestaurar(null).ok).toBe(false);
+    expect(validarPayloadParaRestaurar([]).ok).toBe(false);
+    expect(validarPayloadParaRestaurar("x").ok).toBe(false);
+    expect(validarPayloadParaRestaurar(undefined).ok).toBe(false);
   });
 });
