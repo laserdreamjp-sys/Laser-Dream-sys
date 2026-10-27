@@ -2,21 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/current-profile";
 import { nomeDoArquivoDeBackup } from "@/lib/backup";
+import { criarRespostaDeBackup } from "@/lib/backup-resposta";
 
 /**
- * Entrega o arquivo de backup como anexo, pela própria origem do app.
- * O link assinado direto do Supabase fica em outro domínio e o navegador
- * pode abrir o JSON na tela em vez de baixar; aqui o cabeçalho
- * Content-Disposition: attachment e o tipo application/octet-stream
- * forçam o download. O arquivo é repassado em fluxo, sem carregar tudo na memória.
+ * Entrega o backup pela própria origem do app. Por padrão vai dentro de um
+ * .zip (`?formato=zip`), que o Android salva e compartilha sem depender de
+ * como o navegador trata .json; `?formato=json` devolve o JSON puro como anexo.
  */
-export async function GET(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
   const supabase = createClient();
   const profile = await getCurrentProfile();
 
   if (!profile.isAdmin) {
     return NextResponse.json({ error: "Apenas o administrador pode baixar backups." }, { status: 403 });
   }
+
+  const formato = request.nextUrl.searchParams.get("formato") === "json" ? "json" : "zip";
 
   const { data: backup, error } = await supabase
     .from("backups")
@@ -42,20 +43,16 @@ export async function GET(_request: NextRequest, { params }: { params: { id: str
     );
   }
 
-  const arquivo = await fetch(signed.signedUrl);
-  if (!arquivo.ok || !arquivo.body) {
+  let bytes: Uint8Array;
+  try {
+    const arquivo = await fetch(signed.signedUrl);
+    if (!arquivo.ok) {
+      return NextResponse.json({ error: "Não foi possível ler o arquivo de backup." }, { status: 502 });
+    }
+    bytes = new Uint8Array(await arquivo.arrayBuffer());
+  } catch {
     return NextResponse.json({ error: "Não foi possível ler o arquivo de backup." }, { status: 502 });
   }
 
-  const nome = nomeDoArquivoDeBackup(backup.storage_path);
-  const headers = new Headers({
-    "Content-Type": "application/octet-stream",
-    "Content-Disposition": `attachment; filename="${nome}"; filename*=UTF-8''${encodeURIComponent(nome)}`,
-    "Cache-Control": "no-store",
-    "X-Content-Type-Options": "nosniff",
-  });
-  const tamanho = arquivo.headers.get("content-length");
-  if (tamanho) headers.set("Content-Length", tamanho);
-
-  return new Response(arquivo.body, { status: 200, headers });
+  return criarRespostaDeBackup({ nome: nomeDoArquivoDeBackup(backup.storage_path), bytes, formato });
 }

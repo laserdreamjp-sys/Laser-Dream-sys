@@ -25,7 +25,7 @@ Banco: Supabase, projeto `nlhohtbgtiuqyhewbjnu` (`laser-dream-os`, `sa-east-1`).
 
 ## 2. Stack
 
-Next.js 14.2.35 (App Router), React 18.3, TypeScript 5.5 em modo estrito, Tailwind 3.4, recharts, @dnd-kit, lucide-react, react-hook-form com zod, date-fns, Supabase (Postgres, Auth, Storage) com `@supabase/ssr` 0.5.1 e `supabase-js` 2.45.4, deploy na Vercel.
+Next.js 14.2.35 (App Router), React 18.3, TypeScript 5.5 em modo estrito, Tailwind 3.4, recharts, fflate (zip do backup), @dnd-kit, lucide-react, react-hook-form com zod, date-fns, Supabase (Postgres, Auth, Storage) com `@supabase/ssr` 0.5.1 e `supabase-js` 2.45.4, deploy na Vercel.
 
 ## 3. Padrões de código
 
@@ -115,7 +115,7 @@ Triggers: `trg_sales_classify` (BEFORE INSERT em `sales`), `trg_sales_audit` (AF
 |---|---|---|
 | `POST /api/backup/generate` | Administrador | Backup manual |
 | `GET /api/backup/list` | Administrador | Lista backups com o link de download |
-| `GET /api/backup/download/[id]` | Administrador | Entrega o backup como anexo (arquivo repassado em fluxo, `Content-Disposition: attachment`) |
+| `GET /api/backup/download/[id]` | Administrador | Entrega o backup pela própria origem do app, por padrão em `.zip` (`?formato=json` para o JSON puro), sempre como anexo |
 | `POST /api/backup/restore` | Administrador | Restaura (exige `confirm = "RESTAURAR"`; `validarPayloadParaRestaurar` recusa backup `version: 1`, tabela faltando ou `counts` divergente; arquivo corrompido dá erro 400; faz backup de segurança antes) |
 | `GET /api/cron/backup` | Bearer `CRON_SECRET` | Backup diário às 06:00 UTC, retenção de 30 dias |
 | `GET /api/cron/funil-automacoes` | Bearer `CRON_SECRET` | Tarefas e etiquetas do funil e expiração de orçamentos, 09:00 UTC |

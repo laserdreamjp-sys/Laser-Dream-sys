@@ -1,6 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  baixarBackup,
+  compartilharBackup,
+  type DepsBaixar,
+  type ResultadoBaixar,
+} from "@/lib/backup-baixar";
 
 type Backup = {
   id: string;
@@ -22,6 +28,22 @@ function formatDate(value: string) {
   return new Date(value).toLocaleString("pt-BR");
 }
 
+function depsDoNavegador(): DepsBaixar {
+  const nav = navigator as Navigator;
+  return {
+    fetch: (url) => fetch(url),
+    criarLink: () => document.createElement("a"),
+    anexarLink: (link) => document.body.appendChild(link as unknown as Node),
+    criarUrl: (blob) => URL.createObjectURL(blob),
+    revogarUrl: (url) => URL.revokeObjectURL(url),
+    agendar: (fn, ms) => {
+      setTimeout(fn, ms);
+    },
+    compartilhar: nav.share ? (dados) => nav.share(dados) : undefined,
+    podeCompartilhar: nav.canShare ? (dados) => nav.canShare(dados) : undefined,
+  };
+}
+
 export function BackupPanel() {
   const [backups, setBackups] = useState<Backup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +54,28 @@ export function BackupPanel() {
   const [restoreTarget, setRestoreTarget] = useState<Backup | null>(null);
   const [confirmText, setConfirmText] = useState("");
   const [restoring, setRestoring] = useState(false);
+
+  const [ocupado, setOcupado] = useState<string | null>(null);
+  const [resultados, setResultados] = useState<Record<string, ResultadoBaixar>>({});
+
+  async function executar(id: string, acao: typeof baixarBackup) {
+    setOcupado(id);
+    setResultados((r) => {
+      const { [id]: _, ...resto } = r;
+      return resto;
+    });
+    let resultado: ResultadoBaixar;
+    try {
+      resultado = await acao(id, depsDoNavegador());
+    } catch (e) {
+      resultado = {
+        tipo: "erro",
+        mensagem: `Não foi possível concluir: ${e instanceof Error ? e.message : "erro desconhecido"}.`,
+      };
+    }
+    setResultados((r) => ({ ...r, [id]: resultado }));
+    setOcupado(null);
+  }
 
   async function loadBackups() {
     setLoading(true);
@@ -100,6 +144,11 @@ export function BackupPanel() {
         </button>
       </div>
 
+      <p className="text-xs text-muted-foreground">
+        O arquivo baixado é só uma cópia de segurança sua. Para guardar no Google Drive, use
+        Compartilhar.
+      </p>
+
       {message && <p className="text-sm text-gold-700 dark:text-gold-400">{message}</p>}
       {error && <p className="text-sm text-destructive">{error}</p>}
 
@@ -122,16 +171,21 @@ export function BackupPanel() {
                 </td>
                 <td className="px-3 py-2">{formatSize(b.size_bytes)}</td>
                 <td className="px-3 py-2">
-                  <div className="flex gap-3">
-                    {b.download_url && (
-                      <a
-                        href={b.download_url}
-                        download
-                        className="text-xs text-gold-700 underline underline-offset-2 dark:text-gold-400"
-                      >
-                        Baixar
-                      </a>
-                    )}
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      onClick={() => executar(b.id, baixarBackup)}
+                      disabled={ocupado !== null}
+                      className="text-xs text-gold-700 underline underline-offset-2 disabled:opacity-60 dark:text-gold-400"
+                    >
+                      {ocupado === b.id ? "Preparando..." : "Baixar (.zip)"}
+                    </button>
+                    <button
+                      onClick={() => executar(b.id, compartilharBackup)}
+                      disabled={ocupado !== null}
+                      className="text-xs text-gold-700 underline underline-offset-2 disabled:opacity-60 dark:text-gold-400"
+                    >
+                      {ocupado === b.id ? "Preparando..." : "Compartilhar"}
+                    </button>
                     <button
                       onClick={() => {
                         setRestoreTarget(b);
@@ -143,6 +197,18 @@ export function BackupPanel() {
                       Restaurar
                     </button>
                   </div>
+                  {resultados[b.id] && (
+                    <p
+                      role={resultados[b.id].tipo === "erro" ? "alert" : "status"}
+                      className={`mt-1 max-w-xs text-xs ${
+                        resultados[b.id].tipo === "erro"
+                          ? "text-destructive"
+                          : "text-gold-700 dark:text-gold-400"
+                      }`}
+                    >
+                      {resultados[b.id].mensagem}
+                    </p>
+                  )}
                 </td>
               </tr>
             ))}

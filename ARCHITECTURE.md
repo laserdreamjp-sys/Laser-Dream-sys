@@ -36,6 +36,7 @@ O sistema é multi-organização por modelagem (toda tabela de negócio tem `org
 | Fontes | `@fontsource` Inter e Quicksand | n/a | Tipografia local |
 | Ícones | lucide-react | n/a | Menu e botões |
 | Gráficos | recharts | n/a | Gráficos do dashboard (`dashboard-charts.tsx`) |
+| Compactação | fflate | 0.8.2 | Zip do arquivo de backup (`src/lib/backup-zip.ts`) |
 | Arrastar e soltar | @dnd-kit | n/a | Quadro kanban do funil (`funil-board.tsx`) |
 | Banco de dados | Supabase (PostgreSQL) | n/a | 42 tabelas, 1 view, 21 funções do negócio, RLS ativo em todas as tabelas |
 | Autenticação | Supabase Auth (e-mail e senha) | n/a | Sessão por cookies via `@supabase/ssr` |
@@ -193,6 +194,9 @@ laser-dream-os/
 | `unwrap.ts` | `unwrap<T>()` lança erro quando a consulta Supabase retorna `error` |
 | `buscar-todas.ts` | `buscarTodas(consulta, contexto)`: lê todas as linhas em lotes de 1.000 (`TAMANHO_DO_LOTE`), avançando pelo que veio e parando no lote vazio; lança erro em vez de devolver lista parcial. A consulta recebe `(de, ate)`, precisa de ordem estável terminando em coluna única e de `.range(de, ate)`. Usado no Radar, no Dashboard (contagem do Radar e totais de caixa) e nas 4 exportações CSV |
 | `movimentacoes.ts` | Regras puras da tela Histórico: grupos de tipo (Clientes, Vendas, Caixa, Usuários e acesso, Configurações e catálogos, Solicitações, Backups) para entidades, tradução de campos, formatação de valores (vazio, Sim/Não, datas DD/MM/AAAA), leitura e validação dos filtros, período padrão de 30 dias e `tabelaInexistente` (aviso quando a 0045 não foi aplicada). Testado em `movimentacoes.test.ts` |
+| `backup-zip.ts` | `montarZipDoBackup(nomeJson, bytes)` e `nomeDoZip(nomeJson)` (biblioteca `fflate`, nível 6) |
+| `backup-resposta.ts` | `criarRespostaDeBackup({ nome, bytes, formato })`: resposta HTTP de download com os cabeçalhos de anexo |
+| `backup-baixar.ts` | `baixarBackup` e `compartilharBackup` do navegador, com `fetch`, DOM, `navigator` e `URL` injetados (testável): trata erro HTTP, erro de rede, cancelamento e aparelho sem suporte a compartilhar |
 | `senha.ts` | `problemaSenha(senha)` devolve a mensagem do primeiro problema ou `null` (mínimo 8 caracteres, minúscula, maiúscula e número) e `DICA_SENHA`; usado no cadastro por convite |
 | `datas.ts` | Datas no fuso `America/Sao_Paulo`: `hojeLocal()`, `dataLocal(instante)`, `somarDias(data, n)`, `mesAtualLocal()`, `primeiroDiaDoMesLocal()`. Substitui `toISOString().slice(0,10)`, que dá a data em UTC |
 | `cpf.ts` | `normalizeCpf` (só dígitos), `formatCpf` (000.000.000-00), `maskCpf` (oculta dígitos), `isValidCpf` (dígitos verificadores) e a lista `UFS` |
@@ -245,7 +249,7 @@ Tipos gerados do Supabase em estado **defasado**. Cobre apenas `cash_categories`
 |---|---|---|---|
 | `backup/generate/route.ts` | `POST /api/backup/generate` | Administrador | Gera o JSON com `buildBackupPayload`, grava em `backups/<org>/backup-<carimbo>.json` e registra em `backups` com `kind = manual` |
 | `backup/list/route.ts` | `GET /api/backup/list` | Administrador | Lista `backups` e devolve, por arquivo, o link `/api/backup/download/<id>` (mesma origem) |
-| `backup/download/[id]/route.ts` | `GET /api/backup/download/<id>` | Administrador | Entrega o backup como anexo: lê o caminho em `backups`, gera URL assinada de 60 segundos no servidor e repassa o arquivo em fluxo com `Content-Type: application/octet-stream`, `Content-Disposition: attachment` (nome seguro por `nomeDoArquivoDeBackup`) e `Cache-Control: no-store`. O link assinado direto do Supabase (outro domínio) deixava o celular abrir o JSON na tela |
+| `backup/download/[id]/route.ts` | `GET /api/backup/download/<id>[?formato=zip|json]` | Administrador | Entrega o backup pela própria origem do app: lê o caminho em `backups`, gera URL assinada de 60 segundos no servidor, lê o arquivo e responde com `criarRespostaDeBackup`. Padrão `zip`: JSON compactado (`application/zip`, `Content-Disposition: attachment`, nome `.zip`); `json`: `application/octet-stream` como anexo. `Content-Length`, `no-store` e `nosniff` nos dois. Erros em JSON `{ error }` (403, 400, 404, 502). O zip existe porque, no Android, tocar num `.json` salvo abre o navegador (não há outro app para esse tipo) |
 | `backup/restore/route.ts` | `POST /api/backup/restore` | Administrador | Exige `confirm = "RESTAURAR"`, baixa o backup, grava um backup de segurança `pre-restauracao-<carimbo>.json` (`kind = automatico`) e chama a RPC `restore_from_backup(payload)`. Cancela se o backup de segurança falhar |
 | `cron/backup/route.ts` | `GET /api/cron/backup` | `Bearer CRON_SECRET` | Backup diário com service role, `kind = automatico`, remove backups com mais de 30 dias (`RETENTION_DAYS`) do Storage e da tabela |
 | `cron/funil-automacoes/route.ts` | `GET /api/cron/funil-automacoes` | `Bearer CRON_SECRET` | Automações do funil (detalhe em 1.5) |
@@ -291,7 +295,7 @@ Tipos gerados do Supabase em estado **defasado**. Cobre apenas `cash_categories`
 | `settings-form.tsx` | `SettingsForm` | Edita os 12 parâmetros numéricos de `org_settings` |
 | `delete-password-form.tsx` | `DeletePasswordForm` | Altera `org_settings.senha_exclusao_permanente` |
 | `clear-test-data-button.tsx` | `ClearTestDataButton` | Chama a RPC `limpar_dados_de_teste` |
-| `backup-panel.tsx` | `BackupPanel` | Gerar, listar, baixar e restaurar backup (`handleGenerate`, `handleRestore`) |
+| `backup-panel.tsx` | `BackupPanel` | Gerar, listar, baixar e restaurar backup. Cada backup tem "Baixar (.zip)" e "Compartilhar" (Compartilhar abre a folha de compartilhamento do aparelho, que leva ao Google Drive; sem suporte, salva em Downloads), com o resultado ou o erro (status e mensagem) visível abaixo dos botões |
 | `manageable-list.tsx` | `ManageableList` | Lista editável genérica por `table` (adicionar, editar, ativar/desativar, excluir; para quem não é administrador grava em `change_requests`) |
 
 ---
