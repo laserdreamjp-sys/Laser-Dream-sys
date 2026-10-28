@@ -67,7 +67,7 @@ Vercel Cron ──> api/cron/* (createServiceClient, ignora RLS) ──┘
                                                       └──> Supabase Storage (bucket backups)
 ```
 
-1. **Middleware (`src/middleware.ts`)** roda em toda requisição que não seja arquivo estático. Renova a sessão e redireciona usuário não autenticado para `/login`, exceto em `/login` e `/convite`.
+1. **Middleware (`src/middleware.ts`)** roda em toda requisição que não seja arquivo estático. Renova a sessão e redireciona usuário não autenticado para `/login`, exceto em `/login`, `/convite` e `/api/cron/*` (função `rotaPublica`; cada rota de cron se protege com `CRON_SECRET`) e `/convite`.
 2. **Layout autenticado (`src/app/(app)/layout.tsx`)** monta `Sidebar` e `GlobalSearch` e carrega o perfil por `getCurrentProfile()`.
 3. **Páginas (Server Components)** leem o banco com o cliente de servidor, aplicam filtros vindos da URL (`searchParams`) e passam dados prontos a Client Components.
 4. **Client Components** fazem as gravações direto no Supabase pelo cliente do navegador (a segurança depende das políticas RLS) e chamam `router.refresh()` para recarregar os dados do servidor.
@@ -197,6 +197,8 @@ laser-dream-os/
 | `backup-zip.ts` | `montarZipDoBackup(nomeJson, bytes)` e `nomeDoZip(nomeJson)` (biblioteca `fflate`, nível 6) |
 | `backup-resposta.ts` | `criarRespostaDeBackup({ nome, bytes, formato })`: resposta HTTP de download com os cabeçalhos de anexo |
 | `backup-baixar.ts` | `baixarBackup` e `compartilharBackup` do navegador, com `fetch`, DOM, `navigator` e `URL` injetados (testável): trata erro HTTP, erro de rede, cancelamento e aparelho sem suporte a compartilhar |
+| `rotas-publicas.ts` | `rotaPublica(pathname)`: rotas que o middleware deixa passar sem sessão (`/login`, `/convite`, `/api/cron/*`) |
+| `cron-auth.ts` | `cronAutorizado(authorization, secret)`: confere `Bearer <CRON_SECRET>` em tempo constante e recusa quando `CRON_SECRET` não está configurada (antes, `Bearer undefined` passaria) |
 | `senha.ts` | `problemaSenha(senha)` devolve a mensagem do primeiro problema ou `null` (mínimo 8 caracteres, minúscula, maiúscula e número) e `DICA_SENHA`; usado no cadastro por convite |
 | `datas.ts` | Datas no fuso `America/Sao_Paulo`: `hojeLocal()`, `dataLocal(instante)`, `somarDias(data, n)`, `mesAtualLocal()`, `primeiroDiaDoMesLocal()`. Substitui `toISOString().slice(0,10)`, que dá a data em UTC |
 | `cpf.ts` | `normalizeCpf` (só dígitos), `formatCpf` (000.000.000-00), `maskCpf` (oculta dígitos), `isValidCpf` (dígitos verificadores) e a lista `UFS` |
@@ -213,7 +215,7 @@ Tipos gerados do Supabase em estado **defasado**. Cobre apenas `cash_categories`
 
 #### `src/middleware.ts`
 
-`middleware()` cria o cliente Supabase por cookie, chama `auth.getUser()` e redireciona para `/login` quando não há usuário e o caminho não começa com `/login` ou `/convite` (constante `PUBLIC_PATHS`). `config.matcher` exclui arquivos estáticos e imagens.
+`middleware()` cria o cliente Supabase por cookie, chama `auth.getUser()` e redireciona para `/login` quando não há usuário e o caminho não começa com `/login` ou `/convite` (função `rotaPublica` de `src/lib/rotas-publicas.ts`; antes, constante `PUBLIC_PATHS`). `config.matcher` exclui arquivos estáticos e imagens. `/api/cron/*` também é público (o agendador da Vercel não tem sessão); sem essa exceção o agendador era redirecionado para `/login` e os crons nunca rodaram.
 
 #### `src/app/` (telas)
 
@@ -2209,7 +2211,7 @@ Levantamento feito comparando o código com o banco real (projeto `nlhohtbgtiuqy
 
 | # | Prioridade | Achado | Evidência | Recomendação |
 |---|---|---|---|---|
-| 1 | Crítica | Não existe nenhum backup em lugar algum | Tabela `backups` com 0 linhas; painel do Supabase com "No backups"; plano sem backup de plataforma | Gerar um backup manual agora em Configurações e baixar o JSON; verificar `CRON_SECRET` e `SUPABASE_SERVICE_ROLE_KEY` na Vercel para o cron funcionar; considerar plano com backup diário ou o workflow de GitHub Actions para o Google Drive |
+| 1 | Crítica (backup manual funciona; automático corrigido, falta confirmar) | Não existia backup automático | Em 28/10/2026 a tabela `backups` só tinha backups manuais (9). Causas encontradas, nesta ordem: (a) o middleware redirecionava `/api/cron/*` para `/login`, então o agendador da Vercel nunca chegava na rota; (b) faltavam `CRON_SECRET` e `SUPABASE_SERVICE_ROLE_KEY` na Vercel (só existiam as duas `NEXT_PUBLIC_*`); (c) a conferência `auth !== "Bearer ${CRON_SECRET}"` aceitaria "Bearer undefined" se a variável faltasse | (a) `rotaPublica` libera `/api/cron/*`; (b) as duas variáveis foram criadas na Vercel (Production, tipo Secret); (c) `cronAutorizado` recusa quando a senha não está configurada. Testado localmente: sem senha, com senha errada e com "Bearer undefined" dão 401; as demais rotas de backup e as telas seguem para `/login`. Pendente: confirmar o primeiro backup do tipo `automatico` no banco (botão Run em Cron Jobs, ou depois das 06:00 UTC) |
 | 2 | Crítica (resolvido no código) | Backup podia sair incompleto | `buildBackupPayload` usava `select("*")` sem paginação e o PostgREST limita a resposta a 1.000 linhas, com 4.672 clientes e 1.686 vendas | **Corrigido:** leitura paginada com `.range()` ordenada pela chave primária, campo `counts` no JSON (formato `version: 3`) e erro se alguma tabela vier com menos linhas que a contagem do banco. `api/backup/restore` recusa backup `version: 1` e backup cujo `counts` não bata com o tamanho de cada lista de `tables`, antes de gerar o backup de segurança e de chamar `restore_from_backup`. Backups `version: 1` já existentes não podem mais ser restaurados |
 | 3 | Alta (resolvido na 0042) | Venda em dinheiro gerava duas entradas de caixa | `trg_lancar_entrada_caixa_venda` e `trg_sale_cash_sync` eram AFTER INSERT em `sales` e ambos inseriam em `cash_transactions`; além disso `restore_from_backup` desligava só `trg_sale_cash_sync`, então uma restauração também duplicaria o caixa | **Corrigido pela migração 0042:** trigger e função `lancar_entrada_caixa_venda` removidos; índice único parcial `uq_cash_transactions_sale_id`. `fn_sale_cash_sync` é a única origem do lançamento automático. A migração 0043 remove também `trg_reverter_entrada_caixa_venda_cancelada` e sua função, que ficaram sem efeito (o cancelamento é tratado por `fn_sale_cash_sync`). Teste: criar venda em dinheiro no modo teste e contar linhas por `sale_id` |
 | 4 | Alta | Organização fixa no código | UUID `00000000-0000-0000-0000-000000000001` em `cron/backup`, `cron/funil-automacoes`, `scan_duplicates` e `apply_cpf_import` | Aceitável para operação com uma clínica; antes de um segundo cliente, iterar sobre `organizations` |
