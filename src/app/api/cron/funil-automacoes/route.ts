@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { dataLocal, hojeLocal, somarDias } from "@/lib/datas";
+import { cronAutorizado } from "@/lib/cron-auth";
 
 const ORGANIZATION_ID = "00000000-0000-0000-0000-000000000001";
 
@@ -19,8 +20,7 @@ function diffDias(de: string, ate: Date) {
 }
 
 export async function GET(request: NextRequest) {
-  const auth = request.headers.get("authorization");
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!cronAutorizado(request.headers.get("authorization"), process.env.CRON_SECRET)) {
     return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
   }
 
